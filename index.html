@@ -695,10 +695,298 @@
   }
   .toast.show { opacity: 1; }
 
+  /* ─── THE RACK · entry button on home ────────────────────────────── */
+  .rack-entry {
+    position: relative;
+    margin-top: 30px;
+    padding: 10px 22px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: transform 0.08s;
+  }
+  .rack-entry:active { transform: translateY(2px); }
+  .rack-entry__badge {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--pink);
+    color: #fff;
+    font-size: 11px;
+    letter-spacing: 0;
+    line-height: 20px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  /* ─── THE RACK · wall overlay ────────────────────────────────────── */
+  .rack-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--paper);
+    z-index: 150;
+    display: none;
+    overflow-y: auto;
+    padding: 18px 20px 40px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rack-overlay.show { display: block; }
+  .rack-head {
+    text-align: center;
+    padding: 6px 0 14px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 18px;
+  }
+  .rack-head__title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 28px;
+    color: var(--ink);
+  }
+  .rack-head__sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-top: 4px;
+  }
+  .rack-feed { max-width: 380px; margin: 0 auto; }
+  .rack-section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 6px;
+    margin: 22px 0 14px;
+  }
+  .rack-empty {
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 17px;
+    color: var(--ink-mute);
+    padding: 48px 20px;
+  }
+
+  .rack-card {
+    border: 1px solid var(--rule);
+    background: rgba(255, 255, 255, 0.35);
+    margin-bottom: 20px;
+  }
+  .rack-card__photo {
+    aspect-ratio: 1;
+    background: var(--ink);
+    overflow: hidden;
+    border-bottom: 1px solid var(--rule);
+  }
+  .rack-card__photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .rack-card__body { padding: 12px 14px 14px; }
+  .rack-card__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .rack-card__stamp {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    border: 1px solid currentColor;
+    padding: 2px 8px;
+    flex-shrink: 0;
+  }
+  .rack-card__stamp.keep { color: var(--ink); }
+  .rack-card__stamp.toss { color: var(--pink); }
+  .rack-card__cat {
+    flex: 1;
+    min-width: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rack-card__author {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink);
+    max-width: 130px;
+  }
+  .rack-card__author .author-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rack-card__author .author-you { color: var(--pink); font-weight: 600; letter-spacing: 0.10em; }
+  .avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--paper-edge);
+  }
+  .avatar.is-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .rack-card__vibe {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.35;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .rack-card__overruled {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    color: var(--paper);
+    background: var(--pink);
+    padding: 3px 10px;
+    margin-bottom: 10px;
+  }
+  .rack-card__notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .note-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--rule);
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    color: var(--ink);
+    cursor: pointer;
+    max-width: 100%;
+  }
+  .note-chip .avatar { width: 16px; height: 16px; font-size: 9px; }
+  .note-chip.is-curated {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .note-chip.is-curated::before {
+    content: "♥";
+    color: var(--pink);
+    font-size: 11px;
+  }
+  .note-chip.is-add {
+    border: 1.5px dashed var(--ink-mute);
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .rack-card__hint {
+    margin-top: 8px;
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 12.5px;
+    color: var(--ink-mute);
+  }
+
+  /* ─── Stylist pass sheet (chip palette) ──────────────────────────── */
+  .pass-sheet {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 26, 26, 0.35);
+    z-index: 250;
+    display: none;
+    align-items: flex-end;
+  }
+  .pass-sheet.show { display: flex; }
+  .pass-sheet__panel {
+    width: 100%;
+    background: var(--paper);
+    border-top: 1.5px solid var(--ink);
+    padding: 20px 22px calc(24px + env(safe-area-inset-bottom));
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .pass-sheet__title {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--ink);
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .pass-sheet__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 18px;
+  }
+  .pass-sheet__chips .note-chip {
+    padding: 9px 14px;
+    font-size: 14px;
+    min-height: 44px;
+  }
+  .pass-sheet__cancel {
+    display: block;
+    margin: 0 auto;
+    padding: 10px 24px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
   /* Focus rings for keyboard nav */
   .shutter:focus-visible,
   .card__next:focus-visible,
   .err-btn:focus-visible,
+  .rack-entry:focus-visible,
+  .note-chip:focus-visible,
+  .rack-card__author:focus-visible,
   .verdict-overlay__close:focus-visible,
   .processing__cancel:focus-visible {
     outline: 2px solid var(--pink);
@@ -732,6 +1020,11 @@
     </label>
     <div class="shutter-label" data-i18n="tap_to_review">TAP TO REVIEW</div>
     <div class="hint" data-i18n="snap_any_item">snap any item · we file it.</div>
+
+    <button type="button" class="rack-entry" id="rackBtn">
+      <span data-i18n="the_rack">THE RACK</span>
+      <span class="rack-entry__badge hidden" id="rackBadge">0</span>
+    </button>
   </div>
 
   <div class="case-log hidden" id="caseLog">
@@ -847,6 +1140,25 @@
   </article>
 </div>
 
+<!-- THE RACK · public wall of recent fits + stylist notes -->
+<div id="rackOverlay" class="rack-overlay">
+  <button class="verdict-overlay__close" id="closeRack" aria-label="Close">×</button>
+  <header class="rack-head">
+    <div class="rack-head__title" data-i18n="the_rack">THE RACK</div>
+    <div class="rack-head__sub" data-i18n="rack_sub">notes from the floor</div>
+  </header>
+  <div class="rack-feed" id="rackFeed"></div>
+</div>
+
+<!-- Stylist pass sheet · pre-baked chip palette -->
+<div id="passSheet" class="pass-sheet">
+  <div class="pass-sheet__panel">
+    <div class="pass-sheet__title" id="passSheetTitle">leave a note</div>
+    <div class="pass-sheet__chips" id="passSheetChips"></div>
+    <button type="button" class="pass-sheet__cancel" id="passSheetCancel" data-i18n="close_btn">CLOSE</button>
+  </div>
+</div>
+
 <div id="errorOverlay" class="error-overlay">
   <div class="err-stamp" data-i18n="error">ERROR</div>
   <div class="err-msg" id="errMsg">something went wrong</div>
@@ -859,7 +1171,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=1"></script>
-<script type="module" src="app.js?v=v4"></script>
+<script type="module" src="app.js?v=v5"></script>
 
 </body>
 </html>

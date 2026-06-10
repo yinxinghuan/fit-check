@@ -10,7 +10,10 @@ import {
   caseLabel,
   hydrateI18n,
   getSystemPrompt,
-} from "./i18n.js?v=v4";
+  SUGGEST_CHIPS,
+  DEFEND_CHIPS,
+  chipText,
+} from "./i18n.js?v=v5";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -58,6 +61,13 @@ const caseLogTotal = $("caseLogTotal");
 const caseLogKeep  = $("caseLogKeep");
 const caseLogToss  = $("caseLogToss");
 const issueLineEl  = $("issueLine");
+const rackBtn      = $("rackBtn");
+const rackBadge    = $("rackBadge");
+const rackOverlay  = $("rackOverlay");
+const rackFeed     = $("rackFeed");
+const passSheet      = $("passSheet");
+const passSheetTitle = $("passSheetTitle");
+const passSheetChips = $("passSheetChips");
 
 // Aigram bridge — populated by aigram-bridge.js loaded before this module.
 const A = window.Aigram || {};
@@ -65,8 +75,9 @@ const me = { id: A.telegramId || null, name: "" };
 
 const state = {
   photoDataUrl: null,    // data: URL for instant preview
-  photoR2Url:   null,    // R2 URL after upload (for any future social use)
+  photoR2Url:   null,    // R2 URL after upload (wall image + notify ref_url)
   card:         null,    // parsed styling card JSON
+  publishedFitId: null,  // id of the fit auto-published for this verdict
 };
 
 // Monotonic run id — bumped on cancel/retry so stale in-flight results are
@@ -235,6 +246,8 @@ async function runPipeline() {
   hideProcessing();
   showCard();
   incStats(card.verdict);
+  // Auto-publish to THE RACK — making is publishing (no private/public fork).
+  state.publishedFitId = publishFit(card);
 }
 
 function cancelPipeline() {
@@ -475,6 +488,7 @@ function settleCard({ imageUrl, failed, skipImage }) {
     return;
   }
   // Image succeeded — populate then wait for image to actually load before swap
+  updateFitLook(state.publishedFitId, imageUrl);
   cardImg.onload = () => {
     cardPhoto.classList.remove("hidden");
     showSettledCard();
@@ -510,6 +524,7 @@ function closeVerdict() {
   state.photoDataUrl = null;
   state.photoR2Url = null;
   state.card = null;
+  state.publishedFitId = null;
   // Invalidate any in-flight gen-image so it doesn't paint into the next card.
   revealRunId++;
   stopReveal();
@@ -518,6 +533,429 @@ function closeVerdict() {
   cardEl.classList.add("hidden");
   cardImg.src = "";
   fileInput.value = "";
+}
+
+// ─── THE RACK · stylist pass social layer ────────────────────────────
+//
+// Every save row is that user's own data; the wall is a projection:
+//   { fits:   [{ id, photo, look?, cat, era, verdict, vibe, ts }],   // my fits (cap 12)
+//     passes: [{ id, fit_id, author_id, chip, ts }],                 // notes I left on others' fits (cap 40)
+//     hearts: [{ pass_id, fit_id, ts }] }                            // notes on MY fits I curated (cap 60)
+// A note on fit F is "curated" when its id appears in F's author's hearts.
+// Chips are stored by KEY so each viewer reads them in their own locale.
+
+const SEEN_LS_KEY = "fc:rackSeen";
+
+// In-memory source of truth for my own save row. get/data/list is eventually
+// consistent — never refetch-then-write, always write through this mirror.
+let myMirror = null;
+let wall = null; // { fits: [...], newCount }
+
+function selfUser() {
+  return { id: String(me.id || ""), name: t("you_label"), avatar: "" };
+}
+
+function persistMirror() {
+  if (!A.isInAigram || !A.gameUuid || !me.id) return;
+  if (!myMirror) myMirror = {};
+  A.postAigramAPI("/note/aigram/ai/game/save/data", {
+    session_id: A.gameUuid,
+    resource_data: JSON.stringify(myMirror),
+  });
+}
+
+function notifyUser(targetId, event, template, refUrl) {
+  if (!A.isInAigram || !A.gameUuid) return;
+  if (!targetId || String(targetId) === String(me.id)) return; // never self-notify
+  const action = {
+    type: "notify",
+    target_user_id: String(targetId),
+    message: { template, variables: ["sender_name"] },
+  };
+  if (refUrl) {
+    action.image = { ref_url: refUrl, prompt: "a fit on the rack · Fit Check" };
+  }
+  A.postAigramAPI("/note/aigram/ai/game/record/play", {
+    session_id: A.gameUuid,
+    event,
+    config_json: JSON.stringify({ actions: [action] }),
+  });
+}
+
+// ── publish my fits ──
+
+function publishFit(card) {
+  if (!A.isInAigram || !A.gameUuid || !me.id || !state.photoR2Url) return null;
+  if (!myMirror) myMirror = {};
+  const fit = {
+    id: "f_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
+    photo: state.photoR2Url,
+    cat: card.category || "",
+    era: card.era || "",
+    verdict: card.verdict,
+    vibe: card.vibe_line || "",
+    ts: Date.now(),
+  };
+  myMirror.fits = (myMirror.fits || []).slice(-11);
+  myMirror.fits.push(fit);
+  persistMirror();
+  if (wall) {
+    wall.fits.unshift({ ...fit, user: selfUser(), notes: [], curatedDefends: 0 });
+  }
+  return fit.id;
+}
+
+function updateFitLook(fitId, lookUrl) {
+  if (!fitId || !myMirror) return;
+  const f = (myMirror.fits || []).find(x => x && x.id === fitId);
+  if (!f) return;
+  f.look = lookUrl;
+  persistMirror();
+}
+
+// ── wall scan + projection ──
+
+async function scanRack() {
+  if (!A.isInAigram || !A.gameUuid || !me.id) return;
+  let rows;
+  try {
+    const res = await A.callAigramAPI(
+      `/note/aigram/ai/game/get/data/list?session_id=${encodeURIComponent(A.gameUuid)}`,
+      "GET"
+    );
+    rows = res?.data || [];
+  } catch (e) {
+    console.warn("scanRack: data/list failed", e);
+    return;
+  }
+  buildWall(rows);
+  renderRackBadge();
+  if (rackOverlay.classList.contains("show")) renderRackFeed();
+}
+
+function buildWall(rows) {
+  const fits = [];
+  const passes = [];
+  const heartsByUser = {}; // userId -> Map(pass_id -> ts)
+  const meId = String(me.id || "");
+  let selfMeta = null;
+
+  for (const row of rows) {
+    if (!row || !row.resource_data) continue;
+    const uid = String(row.user_id);
+    let p;
+    try { p = JSON.parse(row.resource_data) || {}; } catch { continue; }
+    if (uid === meId) {
+      // Seed the mirror ONCE; afterwards the mirror is authoritative for my
+      // row (server echo lags behind my own writes).
+      if (!myMirror) myMirror = p;
+      selfMeta = { id: uid, name: row.user_name || "", avatar: row.head_url || "" };
+      continue;
+    }
+    const user = { id: uid, name: row.user_name || "stylist", avatar: row.head_url || "" };
+    for (const f of p.fits || [])   if (f  && f.id  && f.photo)   fits.push({ ...f, user });
+    for (const ps of p.passes || []) if (ps && ps.id && ps.fit_id) passes.push({ ...ps, user });
+    const hm = heartsByUser[uid] = new Map();
+    for (const h of p.hearts || []) if (h && h.pass_id) hm.set(h.pass_id, h.ts || 0);
+  }
+
+  // My contributions come from the mirror, not the (possibly stale) server row.
+  if (!myMirror) myMirror = {};
+  const meUser = selfMeta || selfUser();
+  for (const f of myMirror.fits || [])   if (f  && f.id  && f.photo)   fits.push({ ...f, user: meUser });
+  for (const ps of myMirror.passes || []) if (ps && ps.id && ps.fit_id) passes.push({ ...ps, user: meUser });
+  const mh = heartsByUser[meId] = new Map();
+  for (const h of myMirror.hearts || []) if (h && h.pass_id) mh.set(h.pass_id, h.ts || 0);
+
+  // Attach notes to fits
+  const byId = new Map();
+  for (const f of fits) { f.notes = []; byId.set(f.id, f); }
+  for (const ps of passes) {
+    const f = byId.get(ps.fit_id);
+    if (!f || ps.user.id === f.user.id) continue; // can't note your own fit
+    f.notes.push(ps);
+  }
+
+  const lastSeen = Number(localStorage.getItem(SEEN_LS_KEY) || 0);
+  const myPassIds = new Set((myMirror.passes || []).map(x => x.id));
+  let newCount = 0;
+  for (const f of fits) {
+    f.notes.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const hm = heartsByUser[f.user.id];
+    for (const n of f.notes) {
+      n.curated = !!(hm && hm.has(n.id));
+      if (f.user.id === meId && (n.ts || 0) > lastSeen) newCount++;
+    }
+    f.curatedDefends = f.verdict === "TOSS" ? f.notes.filter(n => n.curated).length : 0;
+  }
+  // Hearts other authors gave to MY notes
+  for (const uid of Object.keys(heartsByUser)) {
+    if (uid === meId) continue;
+    for (const [pid, ts] of heartsByUser[uid]) {
+      if (myPassIds.has(pid) && ts > lastSeen) newCount++;
+    }
+  }
+
+  fits.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  wall = { fits, newCount };
+}
+
+// ── rack UI ──
+
+function renderRackBadge() {
+  const n = wall ? wall.newCount : 0;
+  if (n > 0) {
+    rackBadge.textContent = String(n);
+    rackBadge.classList.remove("hidden");
+  } else {
+    rackBadge.classList.add("hidden");
+  }
+}
+
+function openRack() {
+  if (!A.isInAigram) { toast(t("rack_outside")); return; }
+  rackOverlay.classList.add("show");
+  renderRackFeed();
+  markRackSeen();
+  scanRack();
+}
+
+function markRackSeen() {
+  try { localStorage.setItem(SEEN_LS_KEY, String(Date.now())); } catch { /* ignore */ }
+  if (wall) wall.newCount = 0;
+  renderRackBadge();
+}
+
+function renderRackFeed() {
+  rackFeed.innerHTML = "";
+  const fits = wall ? wall.fits : [];
+  if (!fits.length) {
+    const d = document.createElement("div");
+    d.className = "rack-empty";
+    d.textContent = t("rack_empty");
+    rackFeed.appendChild(d);
+    return;
+  }
+  const meId = String(me.id || "");
+  const mine   = fits.filter(f => f.user.id === meId);
+  const others = fits.filter(f => f.user.id !== meId);
+  const section = (labelKey, arr) => {
+    if (!arr.length) return;
+    const lab = document.createElement("div");
+    lab.className = "rack-section-label";
+    lab.textContent = t(labelKey);
+    rackFeed.appendChild(lab);
+    for (const f of arr) rackFeed.appendChild(rackCard(f));
+  };
+  section("your_fits", mine);
+  section("on_the_rack", others);
+}
+
+function makeAvatar(user) {
+  if (user.avatar) {
+    const img = document.createElement("img");
+    img.className = "avatar";
+    img.src = user.avatar;
+    img.alt = "";
+    img.referrerPolicy = "no-referrer";
+    img.draggable = false;
+    return img;
+  }
+  const d = document.createElement("div");
+  d.className = "avatar is-initial";
+  d.textContent = (user.name || "?").slice(0, 1).toUpperCase();
+  return d;
+}
+
+function authorChip(user, isMine) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "rack-card__author";
+  if (isMine) {
+    const s = document.createElement("span");
+    s.className = "author-you";
+    s.textContent = t("you_label");
+    b.appendChild(s);
+    b.style.cursor = "default";
+  } else {
+    b.appendChild(makeAvatar(user));
+    const s = document.createElement("span");
+    s.className = "author-name";
+    s.textContent = user.name || "stylist";
+    b.appendChild(s);
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (A.openAigramProfile) A.openAigramProfile(user.id);
+    });
+  }
+  return b;
+}
+
+function noteChip(fit, note, isMineFit) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "note-chip" + (note.curated ? " is-curated" : "");
+  b.appendChild(makeAvatar(note.user));
+  const s = document.createElement("span");
+  s.textContent = chipText(note.chip);
+  b.appendChild(s);
+  if (isMineFit && !note.curated) {
+    // onClick (not pointerdown) — we're inside a scrollable feed
+    b.addEventListener("click", () => heartPass(fit, note));
+  } else if (!isMineFit) {
+    b.addEventListener("click", () => {
+      if (A.openAigramProfile) A.openAigramProfile(note.user.id);
+    });
+  } else {
+    b.style.cursor = "default";
+  }
+  return b;
+}
+
+function rackCard(fit) {
+  const meId = String(me.id || "");
+  const isMine = fit.user.id === meId;
+  const isToss = fit.verdict === "TOSS";
+
+  const el = document.createElement("article");
+  el.className = "rack-card";
+
+  const ph = document.createElement("div");
+  ph.className = "rack-card__photo";
+  const img = document.createElement("img");
+  img.src = fit.photo;
+  img.alt = "";
+  img.loading = "lazy";
+  img.draggable = false;
+  ph.appendChild(img);
+  el.appendChild(ph);
+
+  const body = document.createElement("div");
+  body.className = "rack-card__body";
+
+  const meta = document.createElement("div");
+  meta.className = "rack-card__meta";
+  const stamp = document.createElement("span");
+  stamp.className = "rack-card__stamp " + (isToss ? "toss" : "keep");
+  stamp.textContent = isToss ? "TOSS" : "KEEP";
+  meta.appendChild(stamp);
+  const cat = document.createElement("span");
+  cat.className = "rack-card__cat";
+  cat.textContent = fit.cat || "";
+  meta.appendChild(cat);
+  meta.appendChild(authorChip(fit.user, isMine));
+  body.appendChild(meta);
+
+  if (fit.vibe) {
+    const v = document.createElement("div");
+    v.className = "rack-card__vibe";
+    v.textContent = fit.vibe;
+    body.appendChild(v);
+  }
+
+  // TOSS verdict flips once the author keeps 3 defenses — the easter egg
+  if (isToss && fit.curatedDefends >= 3) {
+    const o = document.createElement("div");
+    o.className = "rack-card__overruled";
+    o.textContent = t("overruled") + " · KEEP";
+    body.appendChild(o);
+  }
+
+  const notes = document.createElement("div");
+  notes.className = "rack-card__notes";
+  for (const n of fit.notes) notes.appendChild(noteChip(fit, n, isMine));
+  if (!isMine) {
+    const already = fit.notes.some(n => n.user.id === meId);
+    if (!already) {
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "note-chip is-add";
+      add.textContent = t(isToss ? "defend_note" : "add_note");
+      add.addEventListener("click", () => openPassSheet(fit));
+      notes.appendChild(add);
+    }
+  }
+  body.appendChild(notes);
+
+  if (isMine && fit.notes.some(n => !n.curated)) {
+    const h = document.createElement("div");
+    h.className = "rack-card__hint";
+    h.textContent = t("tap_note_keep");
+    body.appendChild(h);
+  }
+
+  el.appendChild(body);
+  return el;
+}
+
+// ── stylist pass sheet ──
+
+function openPassSheet(fit) {
+  const isToss = fit.verdict === "TOSS";
+  passSheetTitle.textContent = t(isToss ? "defend_sheet_title" : "pass_sheet_title");
+  passSheetChips.innerHTML = "";
+  for (const key of (isToss ? DEFEND_CHIPS : SUGGEST_CHIPS)) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "note-chip";
+    b.textContent = chipText(key);
+    b.addEventListener("click", () => sendPass(fit, key));
+    passSheetChips.appendChild(b);
+  }
+  passSheet.classList.add("show");
+}
+
+function closePassSheet() {
+  passSheet.classList.remove("show");
+}
+
+function sendPass(fit, chipKey) {
+  closePassSheet();
+  const meId = String(me.id || "");
+  if (!A.isInAigram || !meId || fit.user.id === meId) return;
+  if (((myMirror && myMirror.passes) || []).some(p => p.fit_id === fit.id)) {
+    toast(t("already_noted"));
+    return;
+  }
+  if (!myMirror) myMirror = {};
+  const pass = {
+    id: "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
+    fit_id: fit.id,
+    author_id: fit.user.id,
+    chip: chipKey,
+    ts: Date.now(),
+  };
+  myMirror.passes = (myMirror.passes || []).slice(-39);
+  myMirror.passes.push(pass);
+  persistMirror();
+
+  // Optimistic insert so the note shows immediately
+  fit.notes.unshift({ ...pass, user: selfUser(), curated: false });
+  renderRackFeed();
+
+  const tmpl = t(fit.verdict === "TOSS" ? "notify_defend" : "notify_pass")
+    .replace("%s", chipText(chipKey));
+  notifyUser(fit.user.id, "stylist_pass", tmpl, fit.photo);
+  toast(t("noted"));
+}
+
+function heartPass(fit, note) {
+  const meId = String(me.id || "");
+  if (!A.isInAigram || !meId) return;
+  if (!myMirror) myMirror = {};
+  if ((myMirror.hearts || []).some(h => h.pass_id === note.id)) return;
+  myMirror.hearts = (myMirror.hearts || []).slice(-59);
+  myMirror.hearts.push({ pass_id: note.id, fit_id: fit.id, ts: Date.now() });
+  persistMirror();
+
+  note.curated = true;
+  if (fit.verdict === "TOSS") {
+    fit.curatedDefends = fit.notes.filter(n => n.curated).length;
+  }
+  renderRackFeed();
+
+  notifyUser(note.user.id, "pass_kept", t("notify_heart"), fit.photo);
+  toast(t("kept_note"));
 }
 
 // ─── UI helpers ──────────────────────────────────────────────────────
@@ -614,6 +1052,14 @@ function init() {
     hideError();
     cancelPipeline();
   });
+  // THE RACK — modal close buttons use onClick (pointerdown bleeds through)
+  rackBtn.addEventListener("click", openRack);
+  $("closeRack").addEventListener("click", () => rackOverlay.classList.remove("show"));
+  $("passSheetCancel").addEventListener("click", closePassSheet);
+  passSheet.addEventListener("click", (ev) => {
+    if (ev.target === passSheet) closePassSheet();
+  });
+  scanRack(); // seed mirror + inbox badge (no-op outside Aigram)
   // locale toggle: tap EN / 中 to switch + persist + re-hydrate
   document.querySelectorAll(".locale-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -637,6 +1083,7 @@ function applyLocale() {
   // Re-render dynamic strings that don't have data-i18n
   renderIssueLine();
   renderCaseLog();
+  if (rackOverlay.classList.contains("show")) renderRackFeed();
   // Reveal carousel labels are picked up via t() on next render.
 }
 
