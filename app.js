@@ -9,9 +9,8 @@ import {
   issueLabel,
   caseLabel,
   hydrateI18n,
-  getLookStages,
   getSystemPrompt,
-} from "./i18n.js?v=v3";
+} from "./i18n.js?v=v4";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -45,13 +44,14 @@ const invEl       = $("cardInv");
 const eggEl       = $("cardEgg");
 const colorEl     = $("cardColor");
 const cardFootEl  = $("cardFoot");
-const lookSection = $("secLook");
-const lookImg     = $("lookImg");
-const lookLoading = $("lookLoading");
-const lookTimerEl = $("lookTimer");
-const lookStageEl = $("lookStage");
-const lookNotesUl = $("lookNotes");
-const lookUpNext  = $("lookUpNext");
+const cardEl      = $("card");
+const cardImg     = $("cardImg");
+const cardPhoto   = $("cardPhoto");
+const revealEl    = $("reveal");
+const revealLabel = $("revealLabel");
+const revealBig   = $("revealBig");
+const revealStatus= $("revealStatus");
+const revealTimer = $("revealTimer");
 const nextBtn     = $("nextBtn");
 const caseLog     = $("caseLog");
 const caseLogTotal = $("caseLogTotal");
@@ -310,139 +310,198 @@ function showCard() {
   // footer (case id)
   cardFootEl.textContent = caseLabel(nextCaseNo());
 
-  // THE LOOK (KEEP only — gen-image flatlay, fired in background)
-  // Reset the look slot every render
-  lookImg.classList.add("hidden");
-  lookImg.src = "";
-  lookLoading.classList.remove("hidden");
+  // Reset image slot — will be populated when flatlay arrives
+  cardImg.src = "";
+  cardPhoto.classList.remove("hidden");
+
+  // Phase 1 · show the reveal carousel cycling through this card's content
+  // while the flatlay generates in the background
+  startReveal(c);
+
+  // Phase 2 · TOSS verdicts skip the image (no point visualizing what to
+  // throw away) — just settle without an image after a brief carousel beat
   if (isToss) {
-    lookSection.classList.add("hidden");
+    // Let the carousel run long enough to read the why/but/let-go beats,
+    // then settle without an image (no flatlay for TOSS verdicts).
+    setTimeout(() => settleCard({ skipImage: true }), 7000);
   } else {
-    lookSection.classList.remove("hidden");
     kickOffLook(c);
   }
 
   overlay.classList.add("show");
 }
 
-// ── THE LOOK · staged process display while gen-image is running ──────
+// ── REVEAL CAROUSEL · cycles the card's actual content while gen-image runs ──
+//
+// Phase 1: card is hidden; reveal panel shows category → era → verdict →
+//          vibe → each wear_with → each skip → each where → ref → care
+//          → ..., one item every ~1.7s. User reads teasers while the
+//          flatlay develops in the background.
+// Phase 2: image arrives → hide reveal, populate img at top of card,
+//          unhide card → the full brief is laid out (image first, then
+//          all the same info that was just teased).
 
-// Track current run so stale results / tickers never paint the next card.
-let lookRunId = 0;
+let revealRunId    = 0;
+let revealItems    = [];
+let revealIdx      = 0;
+let revealInt      = null;
+let revealTimerInt = null;
+let revealStart    = 0;
 
-const NOTE_INTERVAL_MS = 1500;
-const TIMER_INTERVAL_MS = 200;
-const NOTES_PER_STAGE = 4;
+const REVEAL_INTERVAL_MS  = 1700;
+const REVEAL_TIMER_MS     = 200;
 
-// Stages + flat queue come from i18n.js. Rebuilt on every kickOffLook so
-// a locale switch mid-session takes effect on the next card.
-let LOOK_STAGES = getLookStages();
-let LOOK_QUEUE  = LOOK_STAGES.flatMap(s => s.notes.map(n => ({ stage: s.name, note: n })));
-function refreshLookData() {
-  LOOK_STAGES = getLookStages();
-  LOOK_QUEUE  = LOOK_STAGES.flatMap(s => s.notes.map(n => ({ stage: s.name, note: n })));
-}
+function buildRevealItems(card) {
+  const items = [];
 
-let lookProcStart = 0;
-let lookNoteIdx   = 0;
-let lookNoteInt   = null;
-let lookTimerInt  = null;
-
-function startLookProcess() {
-  stopLookProcess();
-  refreshLookData();
-  lookProcStart = Date.now();
-  lookNoteIdx = 0;
-
-  // Reset notes list to 3 empty placeholders
-  const lis = lookNotesUl.querySelectorAll(".look-loading__note");
-  lis.forEach(li => {
-    li.textContent = "—";
-    li.className = "look-loading__note is-faded";
+  // Opening trio — the headline beats. These are the "what is this?"
+  // moments before we get into the styling brief itself.
+  if (card.category) {
+    items.push({ label: t("category_label"), big: card.category });
+  }
+  if (card.era || card.archetype) {
+    items.push({
+      label: t("era_label"),
+      big: [card.era, card.archetype].filter(Boolean).join(" · "),
+    });
+  }
+  // The verdict reveal
+  items.push({
+    label: t("verdict_label"),
+    big: card.verdict,
+    isStamp: true,
+    isToss: card.verdict === "TOSS",
   });
-  lookStageEl.textContent = LOOK_STAGES[0].name;
-  setUpNextLine(0);
-  pushLookNote(); // initial push so it doesn't start empty
-
-  lookNoteInt = setInterval(pushLookNote, NOTE_INTERVAL_MS);
-  lookTimerInt = setInterval(updateLookTimer, TIMER_INTERVAL_MS);
-  updateLookTimer();
-}
-
-function stopLookProcess() {
-  if (lookNoteInt) clearInterval(lookNoteInt);
-  if (lookTimerInt) clearInterval(lookTimerInt);
-  lookNoteInt = null;
-  lookTimerInt = null;
-}
-
-function pushLookNote() {
-  // If we exhaust the queue, loop the final stage (image is just slow today).
-  let idx = lookNoteIdx;
-  if (idx >= LOOK_QUEUE.length) {
-    // Recycle within DEVELOPING stage's notes
-    idx = LOOK_QUEUE.length - NOTES_PER_STAGE + ((idx - LOOK_QUEUE.length) % NOTES_PER_STAGE);
-  }
-  const next = LOOK_QUEUE[idx];
-  if (!next) return;
-  lookNoteIdx++;
-
-  // Stage label only changes when we cross a stage boundary
-  if (lookStageEl.textContent !== next.stage) {
-    lookStageEl.textContent = next.stage;
-    const stageIdx = LOOK_STAGES.findIndex(s => s.name === next.stage);
-    setUpNextLine(stageIdx);
+  if (card.vibe_line) {
+    items.push({ label: t("vibe_label"), big: card.vibe_line });
   }
 
-  // Shift queue: oldest drops off the top, newest enters at bottom.
-  // We keep 3 visible — [is-faded] [is-old] [is-fresh]
-  const lis = lookNotesUl.querySelectorAll(".look-loading__note");
-  lis[0].textContent = lis[1].textContent;
-  lis[1].textContent = lis[2].textContent;
-  lis[2].textContent = next.note;
-  lis[0].className = "look-loading__note is-faded";
-  lis[1].className = "look-loading__note is-old";
-  lis[2].className = "look-loading__note is-fresh";
+  if (card.verdict === "KEEP") {
+    for (const w of card.wear_with || []) {
+      items.push({ label: t("wear_with"), big: w });
+    }
+    for (const s of card.skip || []) {
+      items.push({ label: t("skip"), big: s });
+    }
+    for (const w of card.where || []) {
+      items.push({ label: t("where"), big: w });
+    }
+  } else {
+    if (card.why_toss) items.push({ label: t("why"),    big: card.why_toss });
+    if (card.but_if)   items.push({ label: t("but_if"), big: card.but_if   });
+    if (card.let_go)   items.push({ label: t("let_go"), big: card.let_go   });
+  }
+
+  // Sub-grid teases at the tail
+  if (card.reference)     items.push({ label: t("ref"),   big: card.reference     });
+  if (card.care)          items.push({ label: t("care"),  big: card.care          });
+  if (card.investment)    items.push({ label: t("value"), big: card.investment    });
+  if (card.easter_egg)    items.push({ label: t("note"),  big: card.easter_egg    });
+  if (card.color_pairing) items.push({ label: t("color"), big: card.color_pairing });
+
+  return items;
 }
 
-function setUpNextLine(stageIdx) {
-  // Lowercase only for the latin alphabet; CJK pass-through identity.
-  const lower = (s) => /^[\x00-\x7F]+$/.test(s) ? s.toLowerCase() : s;
-  const upcoming = LOOK_STAGES.slice(stageIdx + 1).map(s => lower(s.name)).join(" · ");
-  lookUpNext.textContent = upcoming ? `${t("up_next_prefix")} ${upcoming}` : "";
+function startReveal(card) {
+  stopReveal();
+  revealItems = buildRevealItems(card);
+  revealIdx   = 0;
+  revealStart = Date.now();
+
+  // Reset reveal panel to initial state
+  revealStatus.classList.remove("is-failed");
+  revealStatus.textContent = t("the_look_developing");
+  revealTimer.textContent  = "0s";
+
+  // Show reveal, hide card
+  revealEl.classList.remove("hidden");
+  cardEl.classList.add("hidden");
+
+  pushRevealItem();
+  revealInt      = setInterval(pushRevealItem, REVEAL_INTERVAL_MS);
+  revealTimerInt = setInterval(updateRevealTimer, REVEAL_TIMER_MS);
 }
 
-function updateLookTimer() {
-  const t = Math.floor((Date.now() - lookProcStart) / 1000);
-  lookTimerEl.textContent = t + "s";
+function stopReveal() {
+  if (revealInt)      clearInterval(revealInt);
+  if (revealTimerInt) clearInterval(revealTimerInt);
+  revealInt      = null;
+  revealTimerInt = null;
+}
+
+function pushRevealItem() {
+  if (!revealItems.length) return;
+  // Loop endlessly so a slow gen-image doesn't strand the carousel.
+  const item = revealItems[revealIdx % revealItems.length];
+  revealIdx++;
+
+  // Force animation restart by removing then re-adding the fresh class
+  revealLabel.classList.remove("is-fresh");
+  revealBig.classList.remove("is-fresh", "is-stamp", "is-toss");
+  void revealLabel.offsetWidth;
+  void revealBig.offsetWidth;
+
+  revealLabel.textContent = item.label || "";
+  revealBig.textContent   = item.big   || "";
+  revealLabel.classList.add("is-fresh");
+  revealBig.classList.add("is-fresh");
+  if (item.isStamp) revealBig.classList.add("is-stamp");
+  if (item.isToss)  revealBig.classList.add("is-toss");
+}
+
+function updateRevealTimer() {
+  const secs = Math.floor((Date.now() - revealStart) / 1000);
+  revealTimer.textContent = secs + "s";
+}
+
+// Swap from reveal → settled card once the flatlay arrives, fails, or is
+// intentionally skipped (TOSS verdicts don't get a flatlay).
+function settleCard({ imageUrl, failed, skipImage }) {
+  stopReveal();
+  if (skipImage) {
+    // TOSS path — never had a flatlay coming. Just hide the image slot
+    // and settle the card body.
+    cardPhoto.classList.add("hidden");
+    showSettledCard();
+    return;
+  }
+  if (failed) {
+    // Show the card without an image at top + flag the status briefly so
+    // the user knows the flatlay isn't coming. Card body still reads fine.
+    cardPhoto.classList.add("hidden");
+    revealStatus.textContent = t("flatlay_missed");
+    revealStatus.classList.add("is-failed");
+    setTimeout(showSettledCard, 700);
+    return;
+  }
+  // Image succeeded — populate then wait for image to actually load before swap
+  cardImg.onload = () => {
+    cardPhoto.classList.remove("hidden");
+    showSettledCard();
+  };
+  cardImg.onerror = () => {
+    cardPhoto.classList.add("hidden");
+    showSettledCard();
+  };
+  cardImg.src = imageUrl;
+}
+
+function showSettledCard() {
+  revealEl.classList.add("hidden");
+  cardEl.classList.remove("hidden");
 }
 
 async function kickOffLook(card) {
-  const myRun = ++lookRunId;
-  startLookProcess();
+  const myRun = ++revealRunId;
   const prompt = buildLookPrompt(card);
   try {
     const url = await genImageLook(prompt, state.photoR2Url || null);
-    if (myRun !== lookRunId) { stopLookProcess(); return; }
-    lookImg.src = url;
-    lookImg.onload = () => {
-      if (myRun !== lookRunId) return;
-      stopLookProcess();
-      lookImg.classList.remove("hidden");
-      lookLoading.classList.add("hidden");
-    };
-    lookImg.onerror = () => {
-      if (myRun !== lookRunId) return;
-      stopLookProcess();
-      lookStageEl.textContent = t("missed");
-      lookUpNext.textContent = t("flatlay_failed");
-    };
+    if (myRun !== revealRunId) return;
+    settleCard({ imageUrl: url });
   } catch (e) {
-    if (myRun !== lookRunId) return;
+    if (myRun !== revealRunId) return;
     console.warn("genImageLook failed", e);
-    stopLookProcess();
-    lookStageEl.textContent = "MISSED";
-    lookUpNext.textContent = "the flatlay didn't develop · tap NEXT FIT";
+    settleCard({ failed: true });
   }
 }
 
@@ -452,8 +511,12 @@ function closeVerdict() {
   state.photoR2Url = null;
   state.card = null;
   // Invalidate any in-flight gen-image so it doesn't paint into the next card.
-  lookRunId++;
-  stopLookProcess();
+  revealRunId++;
+  stopReveal();
+  // Reset DOM for next render
+  revealEl.classList.add("hidden");
+  cardEl.classList.add("hidden");
+  cardImg.src = "";
   fileInput.value = "";
 }
 
@@ -574,7 +637,7 @@ function applyLocale() {
   // Re-render dynamic strings that don't have data-i18n
   renderIssueLine();
   renderCaseLog();
-  // Look stages will be picked up on next kickOffLook (refreshLookData).
+  // Reveal carousel labels are picked up via t() on next render.
 }
 
 function onNextFit() {

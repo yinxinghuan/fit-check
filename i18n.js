@@ -66,12 +66,15 @@ const EN = {
   note:                "Note",
   color:               "Color",
 
-  // the look (rich loading panel)
+  // the look + reveal carousel
   the_look:            "The look",
-  now_label:           "Now",
-  up_next_prefix:      "up next:",
-  missed:              "MISSED",
-  flatlay_failed:      "the flatlay didn't develop · tap NEXT FIT",
+  the_look_developing: "the look is developing",
+  flatlay_missed:      "the flatlay didn't develop",
+  category_label:      "the item",
+  era_label:           "era",
+  archetype_label:     "scene",
+  verdict_label:       "verdict",
+  vibe_label:          "the vibe",
 
   // CTAs
   next_fit:            "+ NEXT FIT",
@@ -120,10 +123,13 @@ const ZH = {
   color:               "配色",
 
   the_look:            "搭配图",
-  now_label:           "现在",
-  up_next_prefix:      "接下来:",
-  missed:              "MISSED",
-  flatlay_failed:      "搭配图没出来 · 点 NEXT FIT",
+  the_look_developing: "正在出片",
+  flatlay_missed:      "搭配图没出来",
+  category_label:      "这是什么",
+  era_label:           "年代",
+  archetype_label:     "场景",
+  verdict_label:       "判决",
+  vibe_label:          "气质",
 
   next_fit:            "+ 下一件",
   close_btn:           "CLOSE",

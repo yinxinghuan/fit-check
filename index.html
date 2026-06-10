@@ -432,131 +432,107 @@
   }
   .card__skip-list li::before { color: var(--ink-mute); }
 
-  /* THE LOOK · gen-image flatlay + rich loading process */
-  .card__section-label--with-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-  .look-timer {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10.5px;
-    letter-spacing: 0.14em;
-    color: var(--ink-mute);
-    text-transform: none;
-  }
-  .card__look-frame {
-    position: relative;
-    aspect-ratio: 1;
-    background: var(--paper-edge);
-    border: 1px solid var(--rule);
-    overflow: hidden;
-  }
-  .card__look-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  @keyframes fc-look-reveal {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  .card__look-img:not(.hidden) {
-    animation: fc-look-reveal 0.8s ease-out;
-  }
-
-  /* loading state — dense editorial process panel */
-  .look-loading {
+  /* ─── PHASE 1 · reveal carousel (during gen-image wait) ──────────── */
+  .reveal {
     position: absolute;
     inset: 0;
-    padding: 20px 18px 14px;
-    display: flex;
+    display: none;
     flex-direction: column;
-    gap: 14px;
+    align-items: stretch;
+    justify-content: center;
+    padding: 48px 28px 24px;
     background:
       repeating-linear-gradient(
         180deg,
-        transparent 0 22px,
-        rgba(0, 0, 0, 0.02) 22px 23px
+        transparent 0 32px,
+        rgba(0, 0, 0, 0.015) 32px 33px
       ),
-      var(--paper-edge);
+      var(--paper);
   }
-  .look-loading__stage {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .look-loading__stage-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.20em;
-    color: var(--ink-mute);
-    text-transform: uppercase;
-  }
-  .look-loading__stage-name {
-    font-family: 'Playfair Display', serif;
-    font-weight: 700;
-    font-style: italic;
-    font-size: 32px;
-    line-height: 1;
-    color: var(--ink);
-    letter-spacing: 0.01em;
-  }
+  .reveal:not(.hidden) { display: flex; }
 
-  .look-loading__notes {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+  .reveal__panel {
     flex: 1;
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: center;
-    gap: 6px;
+    text-align: center;
+    gap: 18px;
+    min-height: 0;
   }
-  .look-loading__note {
-    font-family: 'Playfair Display', serif;
-    font-style: italic;
-    font-size: 14.5px;
-    line-height: 1.35;
-    color: var(--ink-soft);
-    padding-left: 16px;
-    position: relative;
-    transition: color 0.6s ease, opacity 0.6s ease, transform 0.6s ease;
-    will-change: color, opacity;
-  }
-  .look-loading__note::before {
-    content: "▸";
-    position: absolute;
-    left: 0;
-    top: 2px;
-    color: var(--pink);
-    font-size: 11px;
-    transition: opacity 0.6s ease;
-  }
-  .look-loading__note.is-fresh {
-    color: var(--ink);
-    opacity: 1;
-  }
-  .look-loading__note.is-fresh::before { opacity: 1; }
-  .look-loading__note.is-old {
-    opacity: 0.55;
-  }
-  .look-loading__note.is-old::before { opacity: 0.6; }
-  .look-loading__note.is-faded {
-    opacity: 0.22;
-  }
-  .look-loading__note.is-faded::before { opacity: 0.3; }
-
-  .look-loading__upnext {
+  .reveal__label {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.16em;
+    font-size: 11px;
+    letter-spacing: 0.24em;
     color: var(--ink-mute);
     text-transform: uppercase;
+    min-height: 14px;
+    transition: opacity 0.45s ease;
+  }
+  .reveal__big {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1.15;
+    color: var(--ink);
+    max-width: 340px;
+    word-wrap: break-word;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .reveal__big.is-stamp {
+    font-style: normal;
+    font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    border: 1.5px solid var(--ink);
+    padding: 10px 24px;
+    color: var(--ink);
+  }
+  .reveal__big.is-stamp.is-toss {
+    border-color: var(--pink);
+    color: var(--pink);
+  }
+
+  @keyframes fc-reveal-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .reveal__big.is-fresh,
+  .reveal__label.is-fresh {
+    animation: fc-reveal-in 0.5s ease-out;
+  }
+
+  .reveal__foot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
     border-top: 1px solid var(--rule);
-    padding-top: 10px;
-    line-height: 1.4;
+    padding-top: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+  .reveal__status.is-failed { color: var(--pink); }
+  .reveal__timer { font-variant-numeric: tabular-nums; }
+
+  /* ─── PHASE 2 · settled card · image at top ──────────────────────── */
+  @keyframes fc-card-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .card:not(.hidden) {
+    animation: fc-card-in 0.5s ease-out;
+  }
+  .card__photo img {
+    /* fade in once src loads */
+    animation: fc-card-in 0.6s ease-out;
   }
 
   /* tossed-path fields are paragraph blocks */
@@ -774,7 +750,27 @@
 
 <div id="verdictOverlay" class="verdict-overlay">
   <button class="verdict-overlay__close" id="closeVerdict" aria-label="Close">×</button>
-  <article class="card" id="card">
+
+  <!-- PHASE 1 · reveal carousel · cycles through the card's actual content
+       while the flatlay generates in the background -->
+  <div class="reveal hidden" id="reveal">
+    <div class="reveal__panel">
+      <div class="reveal__label" id="revealLabel">&nbsp;</div>
+      <div class="reveal__big" id="revealBig">&nbsp;</div>
+    </div>
+    <div class="reveal__foot">
+      <span class="reveal__status" id="revealStatus" data-i18n="the_look_developing">the look is developing</span>
+      <span class="reveal__timer" id="revealTimer">0s</span>
+    </div>
+  </div>
+
+  <!-- PHASE 2 · settled card · revealed once the image arrives.
+       The image sits at the TOP; the rest of the brief follows. -->
+  <article class="card hidden" id="card">
+    <div class="card__photo" id="cardPhoto">
+      <img id="cardImg" alt="">
+    </div>
+
     <header class="card__head card__head--top">
       <div class="card__category" id="cardCategory">item category</div>
       <div class="card__era-arch">
@@ -845,30 +841,6 @@
       </div>
     </div>
 
-    <!-- THE LOOK: editorial flatlay — sits at the bottom so the brief
-         reads first; the gen-image arrives in time with the reader -->
-    <section class="card__section card__look hidden" id="secLook">
-      <div class="card__section-label card__section-label--with-meta">
-        <span data-i18n="the_look">The look</span>
-        <span class="look-timer" id="lookTimer"></span>
-      </div>
-      <div class="card__look-frame" id="lookFrame">
-        <div class="look-loading" id="lookLoading">
-          <div class="look-loading__stage">
-            <span class="look-loading__stage-label" data-i18n="now_label">Now</span>
-            <span class="look-loading__stage-name" id="lookStage">SOURCING</span>
-          </div>
-          <ul class="look-loading__notes" id="lookNotes">
-            <li class="look-loading__note is-faded">—</li>
-            <li class="look-loading__note is-faded">—</li>
-            <li class="look-loading__note is-faded">—</li>
-          </ul>
-          <div class="look-loading__upnext" id="lookUpNext"></div>
-        </div>
-        <img class="card__look-img hidden" id="lookImg" alt="">
-      </div>
-    </section>
-
     <div class="card__foot" id="cardFoot">CASE #00001 · today</div>
 
     <button class="card__next" id="nextBtn" data-i18n="next_fit">+ NEXT FIT</button>
@@ -887,7 +859,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=1"></script>
-<script type="module" src="app.js?v=v3"></script>
+<script type="module" src="app.js?v=v4"></script>
 
 </body>
 </html>
