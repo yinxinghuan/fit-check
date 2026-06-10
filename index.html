@@ -395,6 +395,35 @@
   }
   .card__skip-list li::before { color: var(--ink-mute); }
 
+  /* THE LOOK · gen-image flatlay */
+  .card__look-frame {
+    position: relative;
+    aspect-ratio: 1;
+    background: var(--paper-edge);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+  .card__look-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .card__look-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--ink-mute);
+    animation: ph-blink 2.2s ease-in-out infinite;
+  }
+
   /* tossed-path fields are paragraph blocks */
   .card__para {
     font-family: 'Inter', sans-serif;
@@ -615,6 +644,17 @@
       </div>
     </header>
 
+    <!-- The Look: editorial flatlay (KEEP only; gen-image, async) -->
+    <section class="card__section card__look hidden" id="secLook">
+      <div class="card__section-label">The look</div>
+      <div class="card__look-frame" id="lookFrame">
+        <div class="card__look-loading" id="lookLoading">
+          <span>preparing the flatlay…</span>
+        </div>
+        <img class="card__look-img hidden" id="lookImg" alt="">
+      </div>
+    </section>
+
     <div class="card__verdict">
       <div class="card__stamp keep" id="cardStamp">KEEP</div>
       <div class="card__vibe" id="cardVibe"></div>
@@ -694,7 +734,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=1"></script>
-<script type="module" src="app.js?v=1"></script>
+<script type="module" src="app.js?v=v1"></script>
 
 </body>
 </html>

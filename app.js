@@ -5,6 +5,7 @@
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
 const CHAT_URL      = "https://chat.aiwaves.tech/aigram/api/game-chat";
+const GEN_IMAGE_URL = "https://chat.aiwaves.tech/aigram/api/gen-image";
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,9 @@ const invEl       = $("cardInv");
 const eggEl       = $("cardEgg");
 const colorEl     = $("cardColor");
 const cardFootEl  = $("cardFoot");
+const lookSection = $("secLook");
+const lookImg     = $("lookImg");
+const lookLoading = $("lookLoading");
 const nextBtn     = $("nextBtn");
 const caseLog     = $("caseLog");
 const caseLogTotal = $("caseLogTotal");
@@ -230,6 +234,33 @@ async function recognize(imageUrl) {
   return json?.ok ? json : null;
 }
 
+async function genImageLook(prompt, refUrl) {
+  const body = { prompt };
+  if (refUrl) body.ref_url = refUrl;
+  const res = await fetch(GEN_IMAGE_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`gen-image http ${res.status}`);
+  const json = await res.json();
+  if (!json.url) throw new Error("gen-image returned no url");
+  return json.url;
+}
+
+function buildLookPrompt(card) {
+  // Compose an editorial flatlay prompt from the card's KEEP fields.
+  const item = card.category || "the photographed item";
+  const pieces = (card.wear_with || []).slice(0, 5).join(", ");
+  const era = card.era ? `, era: ${card.era}` : "";
+  return (
+    `editorial styling flatlay photograph: ${item} arranged with ${pieces}. ` +
+    `overhead view on warm cream paper background, soft directional lighting, ` +
+    `magazine still-life composition${era}, high-end fashion editorial, ` +
+    `clean documentary style, square crop.`
+  );
+}
+
 async function callCard(vision) {
   const subject = vision?.labels?.[0] || "unidentified item";
   const caption = vision?.caption || "";
@@ -405,7 +436,46 @@ function showCard() {
   // footer (case id)
   cardFootEl.textContent = `CASE #${nextCaseNo()} · ${todayLabel()}`;
 
+  // THE LOOK (KEEP only — gen-image flatlay, fired in background)
+  // Reset the look slot every render
+  lookImg.classList.add("hidden");
+  lookImg.src = "";
+  lookLoading.classList.remove("hidden");
+  if (isToss) {
+    lookSection.classList.add("hidden");
+  } else {
+    lookSection.classList.remove("hidden");
+    kickOffLook(c);
+  }
+
   overlay.classList.add("show");
+}
+
+// Track the current gen-image run by card-id-equivalent so a stale image
+// from a previous card never paints onto the current one.
+let lookRunId = 0;
+async function kickOffLook(card) {
+  const myRun = ++lookRunId;
+  const prompt = buildLookPrompt(card);
+  try {
+    const url = await genImageLook(prompt, state.photoR2Url || null);
+    if (myRun !== lookRunId) return; // user moved on; ignore
+    lookImg.src = url;
+    lookImg.onload = () => {
+      if (myRun !== lookRunId) return;
+      lookImg.classList.remove("hidden");
+      lookLoading.classList.add("hidden");
+    };
+    // If the image errors out, leave the loading text in place but mark unloved
+    lookImg.onerror = () => {
+      if (myRun !== lookRunId) return;
+      lookLoading.textContent = "the flatlay didn't develop · tap NEXT FIT";
+    };
+  } catch (e) {
+    if (myRun !== lookRunId) return;
+    console.warn("genImageLook failed", e);
+    lookLoading.textContent = "the flatlay didn't develop · tap NEXT FIT";
+  }
 }
 
 function closeVerdict() {
@@ -413,6 +483,8 @@ function closeVerdict() {
   state.photoDataUrl = null;
   state.photoR2Url = null;
   state.card = null;
+  // Invalidate any in-flight gen-image so it doesn't paint into the next card.
+  lookRunId++;
   fileInput.value = "";
 }
 
