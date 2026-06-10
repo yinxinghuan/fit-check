@@ -2,6 +2,17 @@
 // Tap shutter → upload → recognize → game-chat verdict (rich styling card) →
 // render → next.
 
+import {
+  t,
+  getLocale,
+  setLocale,
+  issueLabel,
+  caseLabel,
+  hydrateI18n,
+  getLookStages,
+  getSystemPrompt,
+} from "./i18n.js?v=v3";
+
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
 const CHAT_URL      = "https://chat.aiwaves.tech/aigram/api/game-chat";
@@ -62,149 +73,10 @@ const state = {
 // dropped when they finally come back.
 let runId = 0;
 
-// ── System prompt for the styling card LLM ───────────────────────────
-const SYSTEM_PROMPT = `You are FIT CHECK — best-friend-stylist + thrift archaeologist. A user photographed something. A vision model already identified it; you only see text descriptors. Produce a STYLING CARD as STRICT JSON only — no markdown, no preamble.
+// ── System prompt for the styling card LLM (locale-aware, lives in i18n.js) ─
+// Keeping a tombstone here so future readers don't grep for the literal.
+const _SYSTEM_PROMPT_NOTE = "see i18n.js → getSystemPrompt()";
 
-═══ FOUNDATIONAL FRAME ═══
-The user trusts you to tell the truth. They want to know what to TOSS as much as what to KEEP. The product fails if you only ever say KEEP. Refusing to TOSS something that should be TOSSED is unkind. Real stylists fire half their client's closet by the third session. Bring that energy.
-
-When in doubt between KEEP and TOSS, look HARDER for TOSS signals before defaulting to KEEP. A pretty item with no current closet-neighbors is a TOSS.
-
-═══ BANNED VOCABULARY (do not use these words/phrases) ═══
-"effortless" · "effortlessly chic" · "timeless" · "elevates" · "elevated" · "commands presence" · "confident" · "confidence" · "polished" · "polished edge" · "dreamy" · "edgy" · "edge" · "flair" · "flash" · "pop" · "vibe-y" · "statement piece" · "go-to" · "elevate your look" · "perfect for" · "must-have" · "wardrobe staple" · "versatile" · "iconic" · "stunning" · "chic" · "stylish" · "fashionable" · "must" · "love" · "adore" · "totally" · "absolutely" · "anchors" · "moment" · "X-core moment" · "X-trend revival" · "X-revival moment" · "rugged spirit" · "casual layering" · "play with"
-
-The voice is observed not advertised. Never sell. Describe what the item DOES, structurally and socially. Use verbs that name an action ("commutes from boardroom to bar", "softens after the third drink", "telegraphs old-money on a thrift budget"). Skip adjectives that flatter.
-
-═══ vibe_line — 1 SENTENCE, ≤12 WORDS, ACTION VERB ═══
-These are EXAMPLES OF THE VOICE, not a template to copy verbatim. Write your own.
-Good shape:
-  "telegraphs old-money on a thrift budget"
-  "the kind of jacket strangers ask where it's from"
-  "borrows credit it didn't earn — every wear is a small lie"
-  "looks accidentally rich until you turn around"
-  "rented from 2006 and never returned"
-  "does most of the work; the rest of the outfit is rent"
-Bad shape (cut and rewrite if you produced any of these):
-  "X with confident edge" / "elevates the look" / "perfect for" / "anchors X"
-  "adds a touch of refined toughness" (flattery, no action)
-  "softens an outfit by 30%, dilutes it by 50%" (do not copy this — write your own)
-
-═══ THREE IN-VOICE EXAMPLES ═══
-
-Example A — INPUT:
-SUBJECT: blazer
-DESCRIPTION: A double-breasted navy wool blazer, gold buttons, structured shoulder, mid-thigh hem.
-ATTRIBUTES: double-breasted, navy wool, gold buttons, structured shoulder, mid-thigh
-
-Example A — OUTPUT:
-{
-  "category": "double-breasted navy wool blazer",
-  "era": "late '80s yacht-club revival",
-  "archetype": "trust-fund seasonal rotation",
-  "verdict": "KEEP",
-  "vibe_line": "telegraphs old-money on a thrift budget — works hardest when the rest of the outfit is cheap",
-  "wear_with": [
-    "Levi's 501 in white, hemmed at ankle",
-    "navy crewneck tee, cotton not modal",
-    "Bass Weejun penny loafer, oxblood",
-    "white tube sock, visible",
-    "one signet ring, no other jewelry"
-  ],
-  "skip": [
-    "tailored trousers — too on-brief",
-    "stiletto anything — drains the irony"
-  ],
-  "where": [
-    "first-date dive bar",
-    "book launch",
-    "Thanksgiving with the cousins",
-    "art opening in someone's loft"
-  ],
-  "reference": "Lauren Hutton's off-duty c.1978",
-  "care": "wool — empty pockets before storing, brush down with garment brush after wear",
-  "why_toss": null,
-  "but_if": null,
-  "let_go": null,
-  "investment": "$120-180 at Crossroads if buttons are real brass",
-  "easter_egg": null,
-  "color_pairing": null
-}
-
-Example B — INPUT:
-SUBJECT: jumpsuit
-DESCRIPTION: A short-sleeve cotton-blend jumpsuit in ditsy floral print, elastic waist, wide leg.
-ATTRIBUTES: short-sleeve, ditsy floral, elastic waist, wide leg, cotton blend, mid-rise
-
-Example B — OUTPUT:
-{
-  "category": "ditsy-print cotton jumpsuit",
-  "era": "summer '19 mid-tier-influencer staple",
-  "archetype": "Sunday-farmers-market-but-make-it-aesthetic",
-  "verdict": "TOSS",
-  "vibe_line": "reads as a costume from a wedding you don't remember attending",
-  "wear_with": null,
-  "skip": null,
-  "where": null,
-  "reference": "Madewell SS19",
-  "care": null,
-  "why_toss": "the print is locked to a specific cycle — every styling move points back at that era, no neighbors to play with in a current closet",
-  "but_if": "you garden seriously and don't care; or you have a friend who'd actually wear this without irony",
-  "let_go": "Buffalo Exchange $18-25 best case, otherwise Goodwill or repurpose the fabric — it's good cotton",
-  "investment": null,
-  "easter_egg": null,
-  "color_pairing": null
-}
-
-Example C — INPUT (cute item that looks plausible but should TOSS):
-SUBJECT: top
-DESCRIPTION: Cropped graphic tee in heather grey, distressed neckline, faded screen-print of a 1970s rock band logo.
-ATTRIBUTES: cropped, heather grey, distressed neckline, faded print, screen-printed 70s band logo, jersey cotton
-
-Example C — OUTPUT:
-{
-  "category": "cropped fake-vintage band tee",
-  "era": "Urban Outfitters c.2014",
-  "archetype": "music-festival-cosplay",
-  "verdict": "TOSS",
-  "vibe_line": "borrows credit it didn't earn — every wear is a small lie",
-  "wear_with": null,
-  "skip": null,
-  "where": null,
-  "reference": "Forever 21 SS14 graphic tee wall",
-  "care": null,
-  "why_toss": "the distressing is factory, the band is a stranger to the wearer — the social bet fails on inspection",
-  "but_if": "you actually played the album back to back the year it came out — own it loud",
-  "let_go": "Crossroads will say no. Donate or scrap as cleaning rag — the cotton is too thin to resell",
-  "investment": null,
-  "easter_egg": null,
-  "color_pairing": null
-}
-
-═══ OUTPUT CONTRACT (echo of the examples) ═══
-Always include: category, era, archetype, verdict, vibe_line.
-KEEP path: populate wear_with (3-5 SPECIFIC pieces), skip (1-2), where (3-4), reference, care. Set TOSS fields null.
-TOSS path: populate why_toss, but_if, let_go. Set KEEP fields null. Reference and care optional.
-Conditional fields default to null. Only populate when there is a real observation:
-  • investment — only if vintage / notable label / resale signal exists
-  • easter_egg — only if there is a genuinely hidden detail (lining, hardware, real label era). Default null. If 5 cards in a row had easter_eggs, you're inventing them.
-  • color_pairing — only if the color is unusual / hard to place
-
-═══ SPECIFICITY HARD RULES ═══
-• wear_with: every entry contains EITHER a real brand-and-cut ("Levi's 501 high rise", "Bass Weejun penny loafer", "Doc Martens 1461") OR an ultra-specific descriptor that names a CUT and a fabric and a color ("cream silk camisole", "white tube sock, visible"). NEVER plain category words alone ("jeans / shoes / top / blazer").
-• era: 5-year max range or decade-quarter. NEVER "vintage / classic / modern / contemporary".
-• reference: real person + year, real archive + season, real campaign + year. NEVER invent. If unsure: give a precise TYPE ("'90s minimalist editorial muse") — still concrete, never "trend X revival".
-• archetype: a SCENE someone steps into. NEVER mood words ("polished casual" is banned — see banned vocabulary above).
-
-═══ VERDICT BALANCE ═══
-Target ~70% KEEP / 30% TOSS overall. Triggers for TOSS:
-  • palette-orphan: the item's color/print belongs to a wardrobe palette the user clearly doesn't keep
-  • era-locked: every styling move points back at one specific narrow era (2014 normcore, 2017 millennial pink, etc.)
-  • fabric-failed: cheap synthetic that pills / sheds / sags
-  • execution-broken: bad zipper era, plastic buttons on what should be brass, lining that doesn't match the outer
-A pretty item with no flaws + plausible neighbors in a closet = KEEP. Don't TOSS to look discerning.
-
-═══ LENGTH CAP ═══
-Whole card body ≤ 110 words. Brevity is the voice.`;
 
 // ─── Endpoints ────────────────────────────────────────────────────────
 
@@ -282,7 +154,7 @@ async function callCard(vision) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: getSystemPrompt() },
         { role: "user",   content: userMsg },
       ],
     }),
@@ -314,7 +186,7 @@ async function onFilePicked(e) {
   const f = e.target.files?.[0];
   if (!f) return;
   if (!f.type.startsWith("image/")) {
-    toast("not an image");
+    toast(t("not_an_image"));
     return;
   }
   state.photoDataUrl = await fileToDataURL(f);
@@ -325,20 +197,20 @@ async function runPipeline() {
   const myRun = ++runId;
   hideError();
 
-  showProcessing("UPLOADING", "filing the evidence…");
+  showProcessing(t("step_uploading"), t("msg_uploading"));
   let photoUrl;
   try {
     photoUrl = await uploadDataUrl(state.photoDataUrl);
   } catch (err) {
     if (myRun !== runId) return;
     console.error(err);
-    showError("upload failed · check your connection");
+    showError(t("upload_failed"));
     return;
   }
   if (myRun !== runId) return;
   state.photoR2Url = photoUrl;
 
-  showProcessing("INSPECTING", "reading the seams…");
+  showProcessing(t("step_inspecting"), t("msg_inspecting"));
   let vision = null;
   try {
     vision = await recognize(photoUrl);
@@ -347,14 +219,14 @@ async function runPipeline() {
   }
   if (myRun !== runId) return;
 
-  showProcessing("STYLING", "the stylist is thinking…");
+  showProcessing(t("step_styling"), t("msg_styling"));
   let card;
   try {
     card = await callCard(vision);
   } catch (err) {
     if (myRun !== runId) return;
     console.error(err);
-    showError("the stylist stepped out · try again");
+    showError(t("stylist_stepped_out"));
     return;
   }
   if (myRun !== runId) return;
@@ -436,7 +308,7 @@ function showCard() {
   setRow("subColorRow",  "cardColor", c.color_pairing);
 
   // footer (case id)
-  cardFootEl.textContent = `CASE #${nextCaseNo()} · ${todayLabel()}`;
+  cardFootEl.textContent = caseLabel(nextCaseNo());
 
   // THE LOOK (KEEP only — gen-image flatlay, fired in background)
   // Reset the look slot every render
@@ -458,47 +330,18 @@ function showCard() {
 // Track current run so stale results / tickers never paint the next card.
 let lookRunId = 0;
 
-// 5 stages × ~4 notes each. Notes are observed studio whispers, NOT generic
-// "loading…" — gives reader something to chew while the flatlay develops.
-const LOOK_STAGES = [
-  { name: "SOURCING",   notes: [
-    "pulling the wool from the rack",
-    "fishing the silk cami from rotation",
-    "matching weights in the loafers",
-    "cuban link or no chain — decided no",
-  ]},
-  { name: "ARRANGING",  notes: [
-    "the cami sits 30° off the center seam",
-    "brushing wrinkles out of the wool",
-    "tucking the loafer tongue down a hair",
-    "denim folds three over, hem facing camera",
-  ]},
-  { name: "LIGHTING",   notes: [
-    "warming the key by half a stop",
-    "diffusing the fill through silk",
-    "checking the catchlights on the gold",
-    "softening the shadow on the cami strap",
-  ]},
-  { name: "SHOOTING",   notes: [
-    "exposure dialed to f/8",
-    "shooting the overhead frame",
-    "stepping a half-meter back for breath",
-    "tightening the composition by 4%",
-  ]},
-  { name: "DEVELOPING", notes: [
-    "scanning the contact sheet",
-    "developing the keepers",
-    "color-checking against the swatch",
-    "approving the final · delivering to press",
-  ]},
-];
-
-const NOTE_INTERVAL_MS = 1500;   // how fast the notes roll through
+const NOTE_INTERVAL_MS = 1500;
 const TIMER_INTERVAL_MS = 200;
-
-// Build a flat queue once at module load.
-const LOOK_QUEUE = LOOK_STAGES.flatMap(s => s.notes.map(n => ({ stage: s.name, note: n })));
 const NOTES_PER_STAGE = 4;
+
+// Stages + flat queue come from i18n.js. Rebuilt on every kickOffLook so
+// a locale switch mid-session takes effect on the next card.
+let LOOK_STAGES = getLookStages();
+let LOOK_QUEUE  = LOOK_STAGES.flatMap(s => s.notes.map(n => ({ stage: s.name, note: n })));
+function refreshLookData() {
+  LOOK_STAGES = getLookStages();
+  LOOK_QUEUE  = LOOK_STAGES.flatMap(s => s.notes.map(n => ({ stage: s.name, note: n })));
+}
 
 let lookProcStart = 0;
 let lookNoteIdx   = 0;
@@ -507,6 +350,7 @@ let lookTimerInt  = null;
 
 function startLookProcess() {
   stopLookProcess();
+  refreshLookData();
   lookProcStart = Date.now();
   lookNoteIdx = 0;
 
@@ -562,8 +406,10 @@ function pushLookNote() {
 }
 
 function setUpNextLine(stageIdx) {
-  const upcoming = LOOK_STAGES.slice(stageIdx + 1).map(s => s.name.toLowerCase()).join(" · ");
-  lookUpNext.textContent = upcoming ? `up next: ${upcoming}` : `last beat · arriving`;
+  // Lowercase only for the latin alphabet; CJK pass-through identity.
+  const lower = (s) => /^[\x00-\x7F]+$/.test(s) ? s.toLowerCase() : s;
+  const upcoming = LOOK_STAGES.slice(stageIdx + 1).map(s => lower(s.name)).join(" · ");
+  lookUpNext.textContent = upcoming ? `${t("up_next_prefix")} ${upcoming}` : "";
 }
 
 function updateLookTimer() {
@@ -588,8 +434,8 @@ async function kickOffLook(card) {
     lookImg.onerror = () => {
       if (myRun !== lookRunId) return;
       stopLookProcess();
-      lookStageEl.textContent = "MISSED";
-      lookUpNext.textContent = "the flatlay didn't develop · tap NEXT FIT";
+      lookStageEl.textContent = t("missed");
+      lookUpNext.textContent = t("flatlay_failed");
     };
   } catch (e) {
     if (myRun !== lookRunId) return;
@@ -647,13 +493,7 @@ function fileToDataURL(file) {
 function nextCaseNo() {
   const n = Number(localStorage.getItem("fc:case") || "0") + 1;
   localStorage.setItem("fc:case", String(n));
-  return String(n).padStart(5, "0");
-}
-
-function todayLabel() {
-  const d = new Date();
-  const month = d.toLocaleString("en-US", { month: "short" }).toLowerCase();
-  return `${month} ${d.getDate()}`;
+  return n;
 }
 
 // ─── Stats tally (case log) ──────────────────────────────────────────
@@ -693,10 +533,7 @@ function renderCaseLog(s) {
 
 function renderIssueLine() {
   const s = loadStats();
-  const issueNo = String(s.total + 1).padStart(3, "0");
-  const d = new Date();
-  const month = d.toLocaleString("en-US", { month: "short" }).toLowerCase();
-  issueLineEl.textContent = `No. ${issueNo} · ${month} ${d.getDate()}`;
+  issueLineEl.textContent = issueLabel(s.total + 1);
 }
 
 // ─── init ────────────────────────────────────────────────────────────
@@ -714,8 +551,30 @@ function init() {
     hideError();
     cancelPipeline();
   });
-  renderCaseLog();
+  // locale toggle: tap EN / 中 to switch + persist + re-hydrate
+  document.querySelectorAll(".locale-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const loc = btn.getAttribute("data-loc");
+      if (loc === getLocale()) return;
+      setLocale(loc);
+      applyLocale();
+    });
+  });
+  applyLocale();
+}
+
+function applyLocale() {
+  hydrateI18n();
+  // Active-state on toggle
+  document.querySelectorAll(".locale-btn").forEach(btn => {
+    btn.classList.toggle("is-active", btn.getAttribute("data-loc") === getLocale());
+  });
+  // <html lang> for accessibility / browser hints
+  document.documentElement.setAttribute("lang", getLocale() === "zh" ? "zh" : "en");
+  // Re-render dynamic strings that don't have data-i18n
   renderIssueLine();
+  renderCaseLog();
+  // Look stages will be picked up on next kickOffLook (refreshLookData).
 }
 
 function onNextFit() {

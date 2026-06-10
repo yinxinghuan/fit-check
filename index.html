@@ -72,13 +72,50 @@
     padding-bottom: 12px;
     border-bottom: 1px solid var(--rule);
   }
+  .masthead__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    gap: 8px;
+  }
   .masthead__issue {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 11px;
     letter-spacing: 0.18em;
     color: var(--ink-mute);
     text-transform: uppercase;
-    margin-bottom: 4px;
+  }
+  .locale-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.10em;
+    color: var(--ink-mute);
+  }
+  .locale-toggle .locale-btn {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    color: var(--ink-mute);
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: inherit;
+    transition: color 0.15s;
+  }
+  .locale-toggle .locale-btn:hover { color: var(--ink-soft); }
+  .locale-toggle .locale-btn.is-active {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .locale-toggle .locale-sep {
+    opacity: 0.4;
+  }
+  .locale-toggle .locale-btn:focus-visible {
+    outline: 2px solid var(--pink);
+    outline-offset: 2px;
   }
   .masthead__title {
     font-family: 'Playfair Display', serif;
@@ -698,9 +735,16 @@
 <div class="stage">
 
   <header class="masthead">
-    <div class="masthead__issue" id="issueLine">No. 001 · today</div>
+    <div class="masthead__topbar">
+      <div class="masthead__issue" id="issueLine">No. 001 · today</div>
+      <div class="locale-toggle" id="localeToggle" role="group" aria-label="Language">
+        <button type="button" class="locale-btn" data-loc="en">EN</button>
+        <span class="locale-sep">|</span>
+        <button type="button" class="locale-btn" data-loc="zh">中</button>
+      </div>
+    </div>
     <h1 class="masthead__title">FIT <span class="amp">check</span></h1>
-    <div class="masthead__sub">the closet review</div>
+    <div class="masthead__sub" data-i18n="the_closet_review">the closet review</div>
   </header>
 
   <div class="home">
@@ -710,14 +754,14 @@
         <svg viewBox="0 0 24 24"><path d="M9 3.75A1.75 1.75 0 0 1 10.75 2h2.5A1.75 1.75 0 0 1 15 3.75V5h2.25A2.75 2.75 0 0 1 20 7.75v10A2.75 2.75 0 0 1 17.25 20.5H6.75A2.75 2.75 0 0 1 4 17.75v-10A2.75 2.75 0 0 1 6.75 5H9V3.75ZM12 9.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0 1.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
       </span>
     </label>
-    <div class="shutter-label">TAP TO REVIEW</div>
-    <div class="hint">snap any item · we file it.</div>
+    <div class="shutter-label" data-i18n="tap_to_review">TAP TO REVIEW</div>
+    <div class="hint" data-i18n="snap_any_item">snap any item · we file it.</div>
   </div>
 
   <div class="case-log hidden" id="caseLog">
-    <span><span class="num" id="caseLogTotal">0</span> FILED</span>
-    <span class="case-log__keep"><span id="caseLogKeep">0</span> KEEP</span>
-    <span class="case-log__toss"><span id="caseLogToss">0</span> TOSS</span>
+    <span><span class="num" id="caseLogTotal">0</span> <span data-i18n="filed">FILED</span></span>
+    <span class="case-log__keep"><span id="caseLogKeep">0</span> <span data-i18n="keep">KEEP</span></span>
+    <span class="case-log__toss"><span id="caseLogToss">0</span> <span data-i18n="toss">TOSS</span></span>
   </div>
 
 </div>
@@ -747,56 +791,56 @@
 
     <!-- KEEP path sections -->
     <section class="card__section hidden" id="secWearWith">
-      <div class="card__section-label">Wear with</div>
+      <div class="card__section-label" data-i18n="wear_with">Wear with</div>
       <ul class="card__list" id="cardWearWith"></ul>
     </section>
 
     <section class="card__section hidden" id="secSkip">
-      <div class="card__section-label">Skip</div>
+      <div class="card__section-label" data-i18n="skip">Skip</div>
       <ul class="card__list card__skip-list" id="cardSkip"></ul>
     </section>
 
     <section class="card__section hidden" id="secWhere">
-      <div class="card__section-label">Where</div>
+      <div class="card__section-label" data-i18n="where">Where</div>
       <ul class="card__list" id="cardWhere"></ul>
     </section>
 
     <!-- TOSS path sections -->
     <section class="card__section hidden" id="secWhy">
-      <div class="card__section-label">Why</div>
+      <div class="card__section-label" data-i18n="why">Why</div>
       <p class="card__para" id="cardWhy"></p>
     </section>
 
     <section class="card__section hidden" id="secBut">
-      <div class="card__section-label">But if</div>
+      <div class="card__section-label" data-i18n="but_if">But if</div>
       <p class="card__para" id="cardBut"></p>
     </section>
 
     <section class="card__section hidden" id="secLetGo">
-      <div class="card__section-label">Let go</div>
+      <div class="card__section-label" data-i18n="let_go">Let go</div>
       <p class="card__para" id="cardLetGo"></p>
     </section>
 
     <!-- Sub-grid (REF / CARE / INVESTMENT / EASTER / COLOR) -->
     <div class="card__sub" id="cardSub">
       <div class="card__sub-row hidden" id="subRefRow">
-        <div class="card__sub-key">Ref</div>
+        <div class="card__sub-key" data-i18n="ref">Ref</div>
         <div class="card__sub-val" id="cardRef"></div>
       </div>
       <div class="card__sub-row hidden" id="subCareRow">
-        <div class="card__sub-key">Care</div>
+        <div class="card__sub-key" data-i18n="care">Care</div>
         <div class="card__sub-val" id="cardCare"></div>
       </div>
       <div class="card__sub-row hidden" id="subInvRow">
-        <div class="card__sub-key">Value</div>
+        <div class="card__sub-key" data-i18n="value">Value</div>
         <div class="card__sub-val" id="cardInv"></div>
       </div>
       <div class="card__sub-row hidden" id="subEggRow">
-        <div class="card__sub-key">Note</div>
+        <div class="card__sub-key" data-i18n="note">Note</div>
         <div class="card__sub-val" id="cardEgg"></div>
       </div>
       <div class="card__sub-row hidden" id="subColorRow">
-        <div class="card__sub-key">Color</div>
+        <div class="card__sub-key" data-i18n="color">Color</div>
         <div class="card__sub-val" id="cardColor"></div>
       </div>
     </div>
@@ -805,13 +849,13 @@
          reads first; the gen-image arrives in time with the reader -->
     <section class="card__section card__look hidden" id="secLook">
       <div class="card__section-label card__section-label--with-meta">
-        <span>The look</span>
+        <span data-i18n="the_look">The look</span>
         <span class="look-timer" id="lookTimer"></span>
       </div>
       <div class="card__look-frame" id="lookFrame">
         <div class="look-loading" id="lookLoading">
           <div class="look-loading__stage">
-            <span class="look-loading__stage-label">Now</span>
+            <span class="look-loading__stage-label" data-i18n="now_label">Now</span>
             <span class="look-loading__stage-name" id="lookStage">SOURCING</span>
           </div>
           <ul class="look-loading__notes" id="lookNotes">
@@ -819,9 +863,7 @@
             <li class="look-loading__note is-faded">—</li>
             <li class="look-loading__note is-faded">—</li>
           </ul>
-          <div class="look-loading__upnext" id="lookUpNext">
-            up next: arranging · lighting · shooting · developing
-          </div>
+          <div class="look-loading__upnext" id="lookUpNext"></div>
         </div>
         <img class="card__look-img hidden" id="lookImg" alt="">
       </div>
@@ -829,23 +871,23 @@
 
     <div class="card__foot" id="cardFoot">CASE #00001 · today</div>
 
-    <button class="card__next" id="nextBtn">+ NEXT FIT</button>
+    <button class="card__next" id="nextBtn" data-i18n="next_fit">+ NEXT FIT</button>
   </article>
 </div>
 
 <div id="errorOverlay" class="error-overlay">
-  <div class="err-stamp">ERROR</div>
+  <div class="err-stamp" data-i18n="error">ERROR</div>
   <div class="err-msg" id="errMsg">something went wrong</div>
   <div class="err-actions">
-    <button class="err-btn dismiss" id="errDismiss">CLOSE</button>
-    <button class="err-btn retry" id="errRetry">TRY AGAIN</button>
+    <button class="err-btn dismiss" id="errDismiss" data-i18n="close_btn">CLOSE</button>
+    <button class="err-btn retry" id="errRetry" data-i18n="try_again">TRY AGAIN</button>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=1"></script>
-<script type="module" src="app.js?v=v2"></script>
+<script type="module" src="app.js?v=v3"></script>
 
 </body>
 </html>
