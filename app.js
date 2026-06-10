@@ -17,7 +17,6 @@ const procCancel  = $("procCancel");
 const errOver     = $("errorOverlay");
 const errMsgEl    = $("errMsg");
 const overlay     = $("verdictOverlay");
-const photoImg    = $("cardPhoto");
 const stampEl     = $("cardStamp");
 const vibeEl      = $("cardVibe");
 const categoryEl  = $("cardCategory");
@@ -38,6 +37,10 @@ const cardFootEl  = $("cardFoot");
 const lookSection = $("secLook");
 const lookImg     = $("lookImg");
 const lookLoading = $("lookLoading");
+const lookTimerEl = $("lookTimer");
+const lookStageEl = $("lookStage");
+const lookNotesUl = $("lookNotes");
+const lookUpNext  = $("lookUpNext");
 const nextBtn     = $("nextBtn");
 const caseLog     = $("caseLog");
 const caseLogTotal = $("caseLogTotal");
@@ -403,8 +406,7 @@ function showCard() {
   const c = state.card;
   if (!c) return;
 
-  // photo + header strip
-  photoImg.src = state.photoDataUrl || state.photoR2Url || "";
+  // header strip
   categoryEl.textContent = c.category || "item";
   eraEl.textContent = c.era || "—";
   archetypeEl.textContent = c.archetype || "—";
@@ -451,30 +453,150 @@ function showCard() {
   overlay.classList.add("show");
 }
 
-// Track the current gen-image run by card-id-equivalent so a stale image
-// from a previous card never paints onto the current one.
+// ── THE LOOK · staged process display while gen-image is running ──────
+
+// Track current run so stale results / tickers never paint the next card.
 let lookRunId = 0;
+
+// 5 stages × ~4 notes each. Notes are observed studio whispers, NOT generic
+// "loading…" — gives reader something to chew while the flatlay develops.
+const LOOK_STAGES = [
+  { name: "SOURCING",   notes: [
+    "pulling the wool from the rack",
+    "fishing the silk cami from rotation",
+    "matching weights in the loafers",
+    "cuban link or no chain — decided no",
+  ]},
+  { name: "ARRANGING",  notes: [
+    "the cami sits 30° off the center seam",
+    "brushing wrinkles out of the wool",
+    "tucking the loafer tongue down a hair",
+    "denim folds three over, hem facing camera",
+  ]},
+  { name: "LIGHTING",   notes: [
+    "warming the key by half a stop",
+    "diffusing the fill through silk",
+    "checking the catchlights on the gold",
+    "softening the shadow on the cami strap",
+  ]},
+  { name: "SHOOTING",   notes: [
+    "exposure dialed to f/8",
+    "shooting the overhead frame",
+    "stepping a half-meter back for breath",
+    "tightening the composition by 4%",
+  ]},
+  { name: "DEVELOPING", notes: [
+    "scanning the contact sheet",
+    "developing the keepers",
+    "color-checking against the swatch",
+    "approving the final · delivering to press",
+  ]},
+];
+
+const NOTE_INTERVAL_MS = 1500;   // how fast the notes roll through
+const TIMER_INTERVAL_MS = 200;
+
+// Build a flat queue once at module load.
+const LOOK_QUEUE = LOOK_STAGES.flatMap(s => s.notes.map(n => ({ stage: s.name, note: n })));
+const NOTES_PER_STAGE = 4;
+
+let lookProcStart = 0;
+let lookNoteIdx   = 0;
+let lookNoteInt   = null;
+let lookTimerInt  = null;
+
+function startLookProcess() {
+  stopLookProcess();
+  lookProcStart = Date.now();
+  lookNoteIdx = 0;
+
+  // Reset notes list to 3 empty placeholders
+  const lis = lookNotesUl.querySelectorAll(".look-loading__note");
+  lis.forEach(li => {
+    li.textContent = "—";
+    li.className = "look-loading__note is-faded";
+  });
+  lookStageEl.textContent = LOOK_STAGES[0].name;
+  setUpNextLine(0);
+  pushLookNote(); // initial push so it doesn't start empty
+
+  lookNoteInt = setInterval(pushLookNote, NOTE_INTERVAL_MS);
+  lookTimerInt = setInterval(updateLookTimer, TIMER_INTERVAL_MS);
+  updateLookTimer();
+}
+
+function stopLookProcess() {
+  if (lookNoteInt) clearInterval(lookNoteInt);
+  if (lookTimerInt) clearInterval(lookTimerInt);
+  lookNoteInt = null;
+  lookTimerInt = null;
+}
+
+function pushLookNote() {
+  // If we exhaust the queue, loop the final stage (image is just slow today).
+  let idx = lookNoteIdx;
+  if (idx >= LOOK_QUEUE.length) {
+    // Recycle within DEVELOPING stage's notes
+    idx = LOOK_QUEUE.length - NOTES_PER_STAGE + ((idx - LOOK_QUEUE.length) % NOTES_PER_STAGE);
+  }
+  const next = LOOK_QUEUE[idx];
+  if (!next) return;
+  lookNoteIdx++;
+
+  // Stage label only changes when we cross a stage boundary
+  if (lookStageEl.textContent !== next.stage) {
+    lookStageEl.textContent = next.stage;
+    const stageIdx = LOOK_STAGES.findIndex(s => s.name === next.stage);
+    setUpNextLine(stageIdx);
+  }
+
+  // Shift queue: oldest drops off the top, newest enters at bottom.
+  // We keep 3 visible — [is-faded] [is-old] [is-fresh]
+  const lis = lookNotesUl.querySelectorAll(".look-loading__note");
+  lis[0].textContent = lis[1].textContent;
+  lis[1].textContent = lis[2].textContent;
+  lis[2].textContent = next.note;
+  lis[0].className = "look-loading__note is-faded";
+  lis[1].className = "look-loading__note is-old";
+  lis[2].className = "look-loading__note is-fresh";
+}
+
+function setUpNextLine(stageIdx) {
+  const upcoming = LOOK_STAGES.slice(stageIdx + 1).map(s => s.name.toLowerCase()).join(" · ");
+  lookUpNext.textContent = upcoming ? `up next: ${upcoming}` : `last beat · arriving`;
+}
+
+function updateLookTimer() {
+  const t = Math.floor((Date.now() - lookProcStart) / 1000);
+  lookTimerEl.textContent = t + "s";
+}
+
 async function kickOffLook(card) {
   const myRun = ++lookRunId;
+  startLookProcess();
   const prompt = buildLookPrompt(card);
   try {
     const url = await genImageLook(prompt, state.photoR2Url || null);
-    if (myRun !== lookRunId) return; // user moved on; ignore
+    if (myRun !== lookRunId) { stopLookProcess(); return; }
     lookImg.src = url;
     lookImg.onload = () => {
       if (myRun !== lookRunId) return;
+      stopLookProcess();
       lookImg.classList.remove("hidden");
       lookLoading.classList.add("hidden");
     };
-    // If the image errors out, leave the loading text in place but mark unloved
     lookImg.onerror = () => {
       if (myRun !== lookRunId) return;
-      lookLoading.textContent = "the flatlay didn't develop · tap NEXT FIT";
+      stopLookProcess();
+      lookStageEl.textContent = "MISSED";
+      lookUpNext.textContent = "the flatlay didn't develop · tap NEXT FIT";
     };
   } catch (e) {
     if (myRun !== lookRunId) return;
     console.warn("genImageLook failed", e);
-    lookLoading.textContent = "the flatlay didn't develop · tap NEXT FIT";
+    stopLookProcess();
+    lookStageEl.textContent = "MISSED";
+    lookUpNext.textContent = "the flatlay didn't develop · tap NEXT FIT";
   }
 }
 
@@ -485,6 +607,7 @@ function closeVerdict() {
   state.card = null;
   // Invalidate any in-flight gen-image so it doesn't paint into the next card.
   lookRunId++;
+  stopLookProcess();
   fileInput.value = "";
 }
 

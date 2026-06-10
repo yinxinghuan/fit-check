@@ -395,7 +395,19 @@
   }
   .card__skip-list li::before { color: var(--ink-mute); }
 
-  /* THE LOOK · gen-image flatlay */
+  /* THE LOOK · gen-image flatlay + rich loading process */
+  .card__section-label--with-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .look-timer {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    text-transform: none;
+  }
   .card__look-frame {
     position: relative;
     aspect-ratio: 1;
@@ -409,19 +421,105 @@
     object-fit: cover;
     display: block;
   }
-  .card__look-loading {
+  @keyframes fc-look-reveal {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .card__look-img:not(.hidden) {
+    animation: fc-look-reveal 0.8s ease-out;
+  }
+
+  /* loading state — dense editorial process panel */
+  .look-loading {
     position: absolute;
     inset: 0;
+    padding: 20px 18px 14px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 14px;
+    background:
+      repeating-linear-gradient(
+        180deg,
+        transparent 0 22px,
+        rgba(0, 0, 0, 0.02) 22px 23px
+      ),
+      var(--paper-edge);
+  }
+  .look-loading__stage {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .look-loading__stage-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+  .look-loading__stage-name {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-style: italic;
+    font-size: 32px;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+  }
+
+  .look-loading__notes {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     justify-content: center;
-    text-align: center;
-    padding: 24px;
+    gap: 6px;
+  }
+  .look-loading__note {
     font-family: 'Playfair Display', serif;
     font-style: italic;
-    font-size: 16px;
+    font-size: 14.5px;
+    line-height: 1.35;
+    color: var(--ink-soft);
+    padding-left: 16px;
+    position: relative;
+    transition: color 0.6s ease, opacity 0.6s ease, transform 0.6s ease;
+    will-change: color, opacity;
+  }
+  .look-loading__note::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    color: var(--pink);
+    font-size: 11px;
+    transition: opacity 0.6s ease;
+  }
+  .look-loading__note.is-fresh {
+    color: var(--ink);
+    opacity: 1;
+  }
+  .look-loading__note.is-fresh::before { opacity: 1; }
+  .look-loading__note.is-old {
+    opacity: 0.55;
+  }
+  .look-loading__note.is-old::before { opacity: 0.6; }
+  .look-loading__note.is-faded {
+    opacity: 0.22;
+  }
+  .look-loading__note.is-faded::before { opacity: 0.3; }
+
+  .look-loading__upnext {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
     color: var(--ink-mute);
-    animation: ph-blink 2.2s ease-in-out infinite;
+    text-transform: uppercase;
+    border-top: 1px solid var(--rule);
+    padding-top: 10px;
+    line-height: 1.4;
   }
 
   /* tossed-path fields are paragraph blocks */
@@ -633,9 +731,7 @@
 <div id="verdictOverlay" class="verdict-overlay">
   <button class="verdict-overlay__close" id="closeVerdict" aria-label="Close">×</button>
   <article class="card" id="card">
-    <div class="card__photo"><img id="cardPhoto" alt=""></div>
-
-    <header class="card__head">
+    <header class="card__head card__head--top">
       <div class="card__category" id="cardCategory">item category</div>
       <div class="card__era-arch">
         <span id="cardEra">era</span>
@@ -643,17 +739,6 @@
         <span id="cardArchetype">archetype</span>
       </div>
     </header>
-
-    <!-- The Look: editorial flatlay (KEEP only; gen-image, async) -->
-    <section class="card__section card__look hidden" id="secLook">
-      <div class="card__section-label">The look</div>
-      <div class="card__look-frame" id="lookFrame">
-        <div class="card__look-loading" id="lookLoading">
-          <span>preparing the flatlay…</span>
-        </div>
-        <img class="card__look-img hidden" id="lookImg" alt="">
-      </div>
-    </section>
 
     <div class="card__verdict">
       <div class="card__stamp keep" id="cardStamp">KEEP</div>
@@ -716,6 +801,32 @@
       </div>
     </div>
 
+    <!-- THE LOOK: editorial flatlay — sits at the bottom so the brief
+         reads first; the gen-image arrives in time with the reader -->
+    <section class="card__section card__look hidden" id="secLook">
+      <div class="card__section-label card__section-label--with-meta">
+        <span>The look</span>
+        <span class="look-timer" id="lookTimer"></span>
+      </div>
+      <div class="card__look-frame" id="lookFrame">
+        <div class="look-loading" id="lookLoading">
+          <div class="look-loading__stage">
+            <span class="look-loading__stage-label">Now</span>
+            <span class="look-loading__stage-name" id="lookStage">SOURCING</span>
+          </div>
+          <ul class="look-loading__notes" id="lookNotes">
+            <li class="look-loading__note is-faded">—</li>
+            <li class="look-loading__note is-faded">—</li>
+            <li class="look-loading__note is-faded">—</li>
+          </ul>
+          <div class="look-loading__upnext" id="lookUpNext">
+            up next: arranging · lighting · shooting · developing
+          </div>
+        </div>
+        <img class="card__look-img hidden" id="lookImg" alt="">
+      </div>
+    </section>
+
     <div class="card__foot" id="cardFoot">CASE #00001 · today</div>
 
     <button class="card__next" id="nextBtn">+ NEXT FIT</button>
@@ -734,7 +845,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=1"></script>
-<script type="module" src="app.js?v=v1"></script>
+<script type="module" src="app.js?v=v2"></script>
 
 </body>
 </html>
