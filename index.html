@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="game-uuid" content="a422c5ab-e846-42d0-a34b-1d7fd31ea257" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Fit Check</title>
+<meta name="theme-color" content="#FAF7F0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FAF7F0'/%3E%3Ctext x='50' y='72' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-weight='700' font-size='66' fill='%23FF2D77'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:       #FAF7F0;      /* cream paper, warmer than pure white */
+    --paper-edge:  #EFE9DC;      /* slightly darker for inset shadows */
+    --ink:         #1A1A1A;      /* near-black, never pure black */
+    --ink-soft:    #4A4A4A;      /* secondary text */
+    --ink-mute:    #8A8580;      /* tertiary / labels */
+    --rule:        #D8D2C4;      /* paper grain hairline */
+    --pink:        #FF2D77;      /* hot pink accent (CTA + verdict) */
+    --pink-deep:   #CC1F5E;      /* pressed state */
+    --gold:        #B8923D;      /* secondary accent, foil-ish */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* subtle paper grain — barely-there texture so it doesn't look like blank CSS */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.18;
+    mix-blend-mode: multiply;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* ─── Stage layout (flex column, vertical centering) ─────────────── */
+  .stage {
+    position: relative;
+    min-height: 100vh;
+    padding: 32px 24px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── Editorial masthead ─────────────────────────────────────────── */
+  .masthead {
+    text-align: center;
+    flex-shrink: 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .masthead__issue {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .masthead__title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 38px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .masthead__title .amp {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--pink);
+    margin: 0 2px;
+  }
+  .masthead__sub {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+    letter-spacing: 0.01em;
+  }
+
+  /* ─── Home content: shutter + label + hint ───────────────────────── */
+  .home {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 24px 0;
+  }
+  .shutter {
+    display: block;                 /* <label> is inline by default — won't honor width/height without this */
+    position: relative;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow:
+      0 14px 0 #000,
+      0 22px 36px rgba(0, 0, 0, 0.35),
+      inset 0 -6px 12px rgba(0, 0, 0, 0.35),
+      inset 0 4px 10px rgba(255, 255, 255, 0.10);
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .shutter:active {
+    transform: translateY(8px);
+    box-shadow:
+      0 6px 0 #000,
+      0 10px 18px rgba(0, 0, 0, 0.3),
+      inset 0 -4px 10px rgba(0, 0, 0, 0.35);
+  }
+  .shutter input { display: none; }
+
+  /* Camera glyph inside shutter */
+  .shutter__glyph {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .shutter__glyph svg {
+    width: 64px;
+    height: 64px;
+    fill: var(--paper);
+    opacity: 0.85;
+  }
+  /* Pink dot in center for visual interest */
+  .shutter::after {
+    content: "";
+    position: absolute;
+    bottom: 16px;
+    right: 18px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--pink);
+    box-shadow: 0 0 12px rgba(255, 45, 119, 0.6);
+  }
+
+  .shutter-label {
+    margin-top: 26px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .hint {
+    margin-top: 8px;
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-mute);
+    letter-spacing: 0.02em;
+  }
+
+  /* ─── Case log (cumulative tally chip at bottom) ─────────────────── */
+  .case-log {
+    flex-shrink: 0;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin: 8px auto 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 14px;
+  }
+  .case-log .num { color: var(--ink); font-weight: 600; }
+  .case-log .case-log__keep { color: var(--ink); }
+  .case-log .case-log__toss { color: var(--pink); }
+
+  .hidden { display: none !important; }
+
+  /* ─── Processing overlay ─────────────────────────────────────────── */
+  .processing {
+    position: fixed;
+    inset: 0;
+    background: var(--paper);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 24px;
+    text-align: center;
+  }
+  .processing.show { display: flex; }
+  .processing__cancel {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ink);
+    font-size: 22px;
+    line-height: 40px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .processing__step {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-mute);
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    animation: ph-blink 1.2s ease-in-out infinite;
+  }
+  @keyframes ph-blink { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .processing__msg {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 24px;
+    color: var(--ink);
+    max-width: 320px;
+    line-height: 1.2;
+  }
+
+  /* ─── Verdict card overlay ───────────────────────────────────────── */
+  .verdict-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--paper);
+    z-index: 200;
+    display: none;
+    overflow-y: auto;
+    padding: 18px 20px 32px;
+  }
+  .verdict-overlay.show { display: block; }
+
+  .verdict-overlay__close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ink);
+    font-size: 22px;
+    line-height: 40px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+
+  .card {
+    max-width: 380px;
+    margin: 8px auto 0;
+  }
+
+  /* photo with a clean rule frame */
+  .card__photo {
+    aspect-ratio: 1;
+    background: var(--ink);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .card__photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* header strip: category + era + archetype */
+  .card__head {
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 12px 4px;
+    margin-bottom: 18px;
+  }
+  .card__category {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .card__era-arch {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+  .card__era-arch .dot { color: var(--ink-mute); margin: 0 4px; opacity: 0.6; }
+
+  /* verdict stamp + vibe line */
+  .card__verdict {
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .card__stamp {
+    display: inline-block;
+    padding: 6px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    margin-bottom: 12px;
+  }
+  .card__stamp.keep { color: var(--ink); }
+  .card__stamp.toss { color: var(--pink); }
+  .card__vibe {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 19px;
+    line-height: 1.3;
+    color: var(--ink);
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  /* sections (WEAR WITH, SKIP, WHERE, etc.) */
+  .card__section {
+    margin-top: 22px;
+  }
+  .card__section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.20em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 6px;
+  }
+  .card__list {
+    list-style: none;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .card__list li {
+    padding: 4px 0 4px 18px;
+    position: relative;
+  }
+  .card__list li::before {
+    content: "·";
+    position: absolute;
+    left: 4px;
+    top: 0;
+    color: var(--pink);
+    font-weight: bold;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .card__skip-list li::before { color: var(--ink-mute); }
+
+  /* tossed-path fields are paragraph blocks */
+  .card__para {
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .card__para em {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+  }
+
+  /* footer line: REF / CARE / INVESTMENT / EASTER / COLOR sit as a mini-grid */
+  .card__sub {
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+  .card__sub-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+  .card__sub-key {
+    flex-shrink: 0;
+    width: 64px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    padding-top: 2px;
+  }
+  .card__sub-val {
+    flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--ink);
+  }
+
+  /* footer meta (case number + filed by) */
+  .card__foot {
+    margin-top: 26px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+
+  .card__next {
+    display: block;
+    margin: 28px auto 0;
+    padding: 14px 28px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #000;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .card__next:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #000;
+  }
+
+  /* ─── Error overlay ──────────────────────────────────────────────── */
+  .error-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--paper);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 32px 24px;
+    text-align: center;
+  }
+  .error-overlay.show { display: flex; }
+  .err-stamp {
+    display: inline-block;
+    padding: 6px 22px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    border: 1.5px solid var(--pink);
+    color: var(--pink);
+    margin-bottom: 18px;
+  }
+  .err-msg {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 22px;
+    color: var(--ink);
+    max-width: 280px;
+    line-height: 1.3;
+    margin-bottom: 28px;
+  }
+  .err-actions {
+    display: flex;
+    gap: 10px;
+    max-width: 320px;
+    width: 100%;
+  }
+  .err-btn {
+    flex: 1;
+    min-height: 52px;
+    padding: 12px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .err-btn.retry {
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: 0 6px 0 #000;
+    flex: 2;
+  }
+  .err-btn.retry:active { transform: translateY(4px); box-shadow: 0 2px 0 #000; }
+  .err-btn.dismiss {
+    background: transparent;
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
+  }
+
+  /* ─── Toast (rare) ─────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 400;
+    max-width: 90%;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Focus rings for keyboard nav */
+  .shutter:focus-visible,
+  .card__next:focus-visible,
+  .err-btn:focus-visible,
+  .verdict-overlay__close:focus-visible,
+  .processing__cancel:focus-visible {
+    outline: 2px solid var(--pink);
+    outline-offset: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <header class="masthead">
+    <div class="masthead__issue" id="issueLine">No. 001 · today</div>
+    <h1 class="masthead__title">FIT <span class="amp">check</span></h1>
+    <div class="masthead__sub">the closet review</div>
+  </header>
+
+  <div class="home">
+    <label class="shutter" id="shutter" aria-label="Take a photo">
+      <input id="file" type="file" accept="image/*" capture="environment">
+      <span class="shutter__glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M9 3.75A1.75 1.75 0 0 1 10.75 2h2.5A1.75 1.75 0 0 1 15 3.75V5h2.25A2.75 2.75 0 0 1 20 7.75v10A2.75 2.75 0 0 1 17.25 20.5H6.75A2.75 2.75 0 0 1 4 17.75v-10A2.75 2.75 0 0 1 6.75 5H9V3.75ZM12 9.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0 1.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
+      </span>
+    </label>
+    <div class="shutter-label">TAP TO REVIEW</div>
+    <div class="hint">snap any item · we file it.</div>
+  </div>
+
+  <div class="case-log hidden" id="caseLog">
+    <span><span class="num" id="caseLogTotal">0</span> FILED</span>
+    <span class="case-log__keep"><span id="caseLogKeep">0</span> KEEP</span>
+    <span class="case-log__toss"><span id="caseLogToss">0</span> TOSS</span>
+  </div>
+
+</div>
+
+<div id="processing" class="processing">
+  <button class="processing__cancel" id="procCancel" aria-label="Cancel">×</button>
+  <div class="processing__step" id="procStep">UPLOADING</div>
+  <div class="processing__msg" id="procMsg">filing the evidence…</div>
+</div>
+
+<div id="verdictOverlay" class="verdict-overlay">
+  <button class="verdict-overlay__close" id="closeVerdict" aria-label="Close">×</button>
+  <article class="card" id="card">
+    <div class="card__photo"><img id="cardPhoto" alt=""></div>
+
+    <header class="card__head">
+      <div class="card__category" id="cardCategory">item category</div>
+      <div class="card__era-arch">
+        <span id="cardEra">era</span>
+        <span class="dot">·</span>
+        <span id="cardArchetype">archetype</span>
+      </div>
+    </header>
+
+    <div class="card__verdict">
+      <div class="card__stamp keep" id="cardStamp">KEEP</div>
+      <div class="card__vibe" id="cardVibe"></div>
+    </div>
+
+    <!-- KEEP path sections -->
+    <section class="card__section hidden" id="secWearWith">
+      <div class="card__section-label">Wear with</div>
+      <ul class="card__list" id="cardWearWith"></ul>
+    </section>
+
+    <section class="card__section hidden" id="secSkip">
+      <div class="card__section-label">Skip</div>
+      <ul class="card__list card__skip-list" id="cardSkip"></ul>
+    </section>
+
+    <section class="card__section hidden" id="secWhere">
+      <div class="card__section-label">Where</div>
+      <ul class="card__list" id="cardWhere"></ul>
+    </section>
+
+    <!-- TOSS path sections -->
+    <section class="card__section hidden" id="secWhy">
+      <div class="card__section-label">Why</div>
+      <p class="card__para" id="cardWhy"></p>
+    </section>
+
+    <section class="card__section hidden" id="secBut">
+      <div class="card__section-label">But if</div>
+      <p class="card__para" id="cardBut"></p>
+    </section>
+
+    <section class="card__section hidden" id="secLetGo">
+      <div class="card__section-label">Let go</div>
+      <p class="card__para" id="cardLetGo"></p>
+    </section>
+
+    <!-- Sub-grid (REF / CARE / INVESTMENT / EASTER / COLOR) -->
+    <div class="card__sub" id="cardSub">
+      <div class="card__sub-row hidden" id="subRefRow">
+        <div class="card__sub-key">Ref</div>
+        <div class="card__sub-val" id="cardRef"></div>
+      </div>
+      <div class="card__sub-row hidden" id="subCareRow">
+        <div class="card__sub-key">Care</div>
+        <div class="card__sub-val" id="cardCare"></div>
+      </div>
+      <div class="card__sub-row hidden" id="subInvRow">
+        <div class="card__sub-key">Value</div>
+        <div class="card__sub-val" id="cardInv"></div>
+      </div>
+      <div class="card__sub-row hidden" id="subEggRow">
+        <div class="card__sub-key">Note</div>
+        <div class="card__sub-val" id="cardEgg"></div>
+      </div>
+      <div class="card__sub-row hidden" id="subColorRow">
+        <div class="card__sub-key">Color</div>
+        <div class="card__sub-val" id="cardColor"></div>
+      </div>
+    </div>
+
+    <div class="card__foot" id="cardFoot">CASE #00001 · today</div>
+
+    <button class="card__next" id="nextBtn">+ NEXT FIT</button>
+  </article>
+</div>
+
+<div id="errorOverlay" class="error-overlay">
+  <div class="err-stamp">ERROR</div>
+  <div class="err-msg" id="errMsg">something went wrong</div>
+  <div class="err-actions">
+    <button class="err-btn dismiss" id="errDismiss">CLOSE</button>
+    <button class="err-btn retry" id="errRetry">TRY AGAIN</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="./aigram-bridge.js?v=1"></script>
+<script type="module" src="app.js?v=1"></script>
+
+</body>
+</html>
