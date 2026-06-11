@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v7";
+} from "./i18n.js?v=v8";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -134,17 +134,51 @@ async function genImageLook(prompt, refUrl) {
   return json.url;
 }
 
+// Four serialized illustration styles. The styling LLM picks one per garment
+// (plate_style field, default "catalog"); each has a combo (KEEP, item +
+// companions) and a solo (TOSS, the item alone as a study) variant.
+const PLATE_TAIL =
+  "warm cream paper background, no human figure, no face, " +
+  "no text no letters, square composition";
+
+const PLATE_STYLES = {
+  catalog: {
+    combo: (item, pieces) =>
+      `mid-century department store catalog illustration: ${item} with companion pieces ${pieces} arranged in a tidy grid, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, retro 1958 print advertisement aesthetic, ${PLATE_TAIL}`,
+    solo: (item) =>
+      `mid-century department store catalog illustration: ${item} alone as a single discontinued catalog item, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, retro 1958 print advertisement aesthetic, ${PLATE_TAIL}`,
+  },
+  naturalist: {
+    combo: (item, pieces) =>
+      `vintage naturalist field guide specimen plate: ${item} drawn as a catalogued specimen at center, fine ink linework with muted watercolor wash, smaller companion studies arranged around it: ${pieces}, thin hairline callout lines pointing at details, antique scientific illustration plate, ${PLATE_TAIL}`,
+    solo: (item) =>
+      `vintage naturalist field guide specimen plate: ${item} drawn as a single catalogued specimen at center, fine ink linework with muted watercolor wash, thin hairline callout lines pointing at its worn details, antique scientific illustration plate, ${PLATE_TAIL}`,
+  },
+  croquis: {
+    combo: (item, pieces) =>
+      `fashion atelier sketchbook illustration: ${item} as a hand-drawn study, confident ink outline with loose translucent watercolor wash bleeding past the lines, companion garments sketched smaller beside it: ${pieces}, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
+    solo: (item) =>
+      `fashion atelier sketchbook illustration: ${item} as a single hand-drawn study, confident ink outline with loose translucent watercolor wash bleeding past the lines, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
+  },
+  gouache: {
+    combo: (item, pieces) =>
+      `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes at center, companion pieces ${pieces} arranged around it, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
+    solo: (item) =>
+      `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes, alone at center, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
+  },
+};
+
+function pickPlateStyle(card) {
+  return PLATE_STYLES[card.plate_style] ? card.plate_style : "catalog";
+}
+
 function buildLookPrompt(card) {
-  // Compose an editorial flatlay prompt from the card's KEEP fields.
-  const item = card.category || "the photographed item";
+  const style = PLATE_STYLES[pickPlateStyle(card)];
+  const item = card.category || "the photographed garment";
+  const era = card.era ? ` era flavor: ${card.era}.` : "";
   const pieces = (card.wear_with || []).slice(0, 5).join(", ");
-  const era = card.era ? `, era: ${card.era}` : "";
-  return (
-    `editorial styling flatlay photograph: ${item} arranged with ${pieces}. ` +
-    `overhead view on warm cream paper background, soft directional lighting, ` +
-    `magazine still-life composition${era}, high-end fashion editorial, ` +
-    `clean documentary style, square crop.`
-  );
+  if (card.verdict === "TOSS" || !pieces) return style.solo(item) + era;
+  return style.combo(item, pieces) + era;
 }
 
 async function callCard(vision) {
@@ -331,15 +365,9 @@ function showCard() {
   // while the flatlay generates in the background
   startReveal(c);
 
-  // Phase 2 · TOSS verdicts skip the image (no point visualizing what to
-  // throw away) — just settle without an image after a brief carousel beat
-  if (isToss) {
-    // Let the carousel run long enough to read the why/but/let-go beats,
-    // then settle without an image (no flatlay for TOSS verdicts).
-    setTimeout(() => settleCard({ skipImage: true }), 7000);
-  } else {
-    kickOffLook(c);
-  }
+  // Phase 2 · both verdicts get an illustrated plate — TOSS renders the item
+  // alone as a condemned-specimen study, KEEP gets item + companions.
+  kickOffLook(c);
 
   overlay.classList.add("show");
 }
@@ -467,17 +495,9 @@ function updateRevealTimer() {
   revealTimer.textContent = secs + "s";
 }
 
-// Swap from reveal → settled card once the flatlay arrives, fails, or is
-// intentionally skipped (TOSS verdicts don't get a flatlay).
-function settleCard({ imageUrl, failed, skipImage }) {
+// Swap from reveal → settled card once the plate arrives or fails.
+function settleCard({ imageUrl, failed }) {
   stopReveal();
-  if (skipImage) {
-    // TOSS path — never had a flatlay coming. Just hide the image slot
-    // and settle the card body.
-    cardPhoto.classList.add("hidden");
-    showSettledCard();
-    return;
-  }
   if (failed) {
     // Show the card without an image at top + flag the status briefly so
     // the user knows the flatlay isn't coming. Card body still reads fine.
