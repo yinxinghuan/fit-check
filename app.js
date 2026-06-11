@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v13";
+} from "./i18n.js?v=v14";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -153,25 +153,25 @@ const PLATE_TAIL =
 const PLATE_STYLES = {
   catalog: {
     combo: (item, pieces) =>
-      `mid-century retro print illustration: ${item} with companion pieces ${pieces} arranged in a tidy grid, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
+      `mid-century retro print illustration: ${item} as the dominant hero subject, drawn large at center filling most of the frame, companion pieces ${pieces} drawn at a much smaller scale in a single row along the bottom edge, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
     solo: (item) =>
       `mid-century retro print illustration: ${item} alone at center as a single discontinued item, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
   },
   naturalist: {
     combo: (item, pieces) =>
-      `vintage naturalist field guide specimen plate: ${item} drawn as a catalogued specimen at center, fine ink linework with muted watercolor wash, smaller companion studies arranged around it: ${pieces}, thin hairline callout lines pointing at details, antique scientific illustration plate, ${PLATE_TAIL}`,
+      `vintage naturalist field guide specimen plate: ${item} as the principal specimen, drawn large at center dominating the plate, fine ink linework with muted watercolor wash, much smaller secondary studies tucked in the margins: ${pieces}, thin hairline callout lines pointing at details, antique scientific illustration plate, ${PLATE_TAIL}`,
     solo: (item) =>
       `vintage naturalist field guide specimen plate: ${item} drawn as a single catalogued specimen at center, fine ink linework with muted watercolor wash, thin hairline callout lines pointing at its worn details, antique scientific illustration plate, ${PLATE_TAIL}`,
   },
   croquis: {
     combo: (item, pieces) =>
-      `fashion atelier sketchbook illustration: ${item} as a hand-drawn study, confident ink outline with loose translucent watercolor wash bleeding past the lines, companion garments sketched smaller beside it: ${pieces}, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
+      `fashion atelier sketchbook illustration: ${item} as the main study, drawn large and dominating the page, confident ink outline with loose translucent watercolor wash bleeding past the lines, companion garments sketched far smaller in the margin: ${pieces}, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
     solo: (item) =>
       `fashion atelier sketchbook illustration: ${item} as a single hand-drawn study, confident ink outline with loose translucent watercolor wash bleeding past the lines, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
   },
   gouache: {
     combo: (item, pieces) =>
-      `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes at center, companion pieces ${pieces} arranged around it, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
+      `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes as the dominant subject, large at center filling most of the frame, companion pieces ${pieces} much smaller at the edges, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
     solo: (item) =>
       `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes, alone at center, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
   },
@@ -186,7 +186,8 @@ function buildLookPrompt(card) {
   // Era folds INTO the item descriptor — never appended after PLATE_TAIL.
   const item = (card.category || "the photographed garment") +
                (card.era ? `, ${card.era} era` : "");
-  const pieces = (card.wear_with || []).slice(0, 5).join(", ");
+  // Three companions max — five invites a grid where the hero shrinks.
+  const pieces = (card.wear_with || []).slice(0, 3).join(", ");
   if (card.verdict === "TOSS" || !pieces) return style.solo(item);
   return style.combo(item, pieces);
 }
@@ -912,18 +913,6 @@ function rackCard(fit, opts) {
   if (!detail) {
     ph.classList.add("is-tappable");
     ph.addEventListener("click", () => openFitDetail(fit));
-  } else if (fit.look && fit.photo && fit.look !== fit.photo) {
-    let showingOriginal = false;
-    const flip = document.createElement("button");
-    flip.type = "button";
-    flip.className = "fit-flip";
-    flip.textContent = t("view_original");
-    flip.addEventListener("click", () => {
-      showingOriginal = !showingOriginal;
-      img.src = showingOriginal ? fit.photo : fit.look;
-      flip.textContent = t(showingOriginal ? "view_plate" : "view_original");
-    });
-    el.appendChild(flip);
   }
 
   const body = document.createElement("div");
@@ -1118,7 +1107,7 @@ function sendPass(fit, chipKey) {
 
   const tmpl = t(fit.verdict === "TOSS" ? "notify_defend" : "notify_pass")
     .replace("%s", chipText(chipKey));
-  notifyUser(fit.user.id, "stylist_pass", tmpl, fit.photo);
+  notifyUser(fit.user.id, "stylist_pass", tmpl, fit.look || fit.photo);
   toast(t("noted"));
 }
 
@@ -1137,7 +1126,7 @@ function heartPass(fit, note) {
   }
   rerenderSocial();
 
-  notifyUser(note.user.id, "pass_kept", t("notify_heart"), fit.photo);
+  notifyUser(note.user.id, "pass_kept", t("notify_heart"), fit.look || fit.photo);
   toast(t("kept_note"));
 }
 
