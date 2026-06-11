@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v12";
+} from "./i18n.js?v=v13";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -615,6 +615,26 @@ function notifyUser(targetId, event, template, refUrl) {
 
 // ── publish my fits ──
 
+// The full styling brief rides along with the fit so the detail view can
+// reproduce the verdict card for other stylists (undefined keys vanish in
+// JSON.stringify, so empty cards cost nothing).
+function pickBrief(c) {
+  const b = {};
+  if (c.archetype)                       b.archetype     = c.archetype;
+  if (c.wear_with && c.wear_with.length) b.wear_with     = c.wear_with;
+  if (c.skip && c.skip.length)           b.skip          = c.skip;
+  if (c.where && c.where.length)         b.where         = c.where;
+  if (c.why_toss)                        b.why_toss      = c.why_toss;
+  if (c.but_if)                          b.but_if        = c.but_if;
+  if (c.let_go)                          b.let_go        = c.let_go;
+  if (c.reference)                       b.reference     = c.reference;
+  if (c.care)                            b.care          = c.care;
+  if (c.investment)                      b.investment    = c.investment;
+  if (c.easter_egg)                      b.easter_egg    = c.easter_egg;
+  if (c.color_pairing)                   b.color_pairing = c.color_pairing;
+  return Object.keys(b).length ? b : undefined;
+}
+
 function publishFit(card) {
   if (!A.isInAigram || !A.gameUuid || !me.id || !state.photoR2Url) return null;
   if (!myMirror) myMirror = {};
@@ -625,6 +645,7 @@ function publishFit(card) {
     era: card.era || "",
     verdict: card.verdict,
     vibe: card.vibe_line || "",
+    brief: pickBrief(card),
     ts: Date.now(),
   };
   myMirror.fits = (myMirror.fits || []).slice(-11);
@@ -936,6 +957,15 @@ function rackCard(fit, opts) {
     body.appendChild(o);
   }
 
+  if (detail && fit.brief) body.appendChild(briefBlock(fit));
+
+  if (detail && (fit.notes.length || !isMine)) {
+    const nl = document.createElement("div");
+    nl.className = "card__section-label rack-card__notes-label";
+    nl.textContent = t("notes_label");
+    body.appendChild(nl);
+  }
+
   const notes = document.createElement("div");
   notes.className = "rack-card__notes";
   for (const n of fit.notes) notes.appendChild(noteChip(fit, n, isMine));
@@ -961,6 +991,84 @@ function rackCard(fit, opts) {
 
   el.appendChild(body);
   return el;
+}
+
+// Reproduce the verdict card's brief inside the detail card, reusing the
+// card__section / card__sub styles so both read as the same magazine page.
+function briefBlock(fit) {
+  const b = fit.brief;
+  const wrap = document.createElement("div");
+  wrap.className = "rack-card__brief";
+
+  const section = (labelKey) => {
+    const sec = document.createElement("section");
+    sec.className = "card__section";
+    const lab = document.createElement("div");
+    lab.className = "card__section-label";
+    lab.textContent = t(labelKey);
+    sec.appendChild(lab);
+    wrap.appendChild(sec);
+    return sec;
+  };
+  const addList = (labelKey, arr, isSkip) => {
+    if (!arr || !arr.length) return;
+    const sec = section(labelKey);
+    const ul = document.createElement("ul");
+    ul.className = "card__list" + (isSkip ? " card__skip-list" : "");
+    for (const item of arr) {
+      const li = document.createElement("li");
+      li.textContent = String(item);
+      ul.appendChild(li);
+    }
+    sec.appendChild(ul);
+  };
+  const addPara = (labelKey, text) => {
+    if (!text) return;
+    const sec = section(labelKey);
+    const p = document.createElement("p");
+    p.className = "card__para";
+    p.textContent = String(text);
+    sec.appendChild(p);
+  };
+
+  if (fit.verdict === "TOSS") {
+    addPara("why",    b.why_toss);
+    addPara("but_if", b.but_if);
+    addPara("let_go", b.let_go);
+  } else {
+    addList("wear_with", b.wear_with);
+    addList("skip",      b.skip, true);
+    addList("where",     b.where);
+  }
+
+  const subRows = [
+    ["archetype_label", b.archetype],
+    ["ref",   b.reference],
+    ["care",  b.care],
+    ["value", b.investment],
+    ["note",  b.easter_egg],
+    ["color", b.color_pairing],
+  ].filter(r => r[1]);
+  if (subRows.length) {
+    const sub = document.createElement("div");
+    sub.className = "card__sub";
+    for (const [key, val] of subRows) {
+      const row = document.createElement("div");
+      row.className = "card__sub-row";
+      const k = document.createElement("div");
+      k.className = "card__sub-key";
+      k.textContent = t(key);
+      const v = document.createElement("div");
+      v.className = "card__sub-val";
+      v.textContent = String(val);
+      row.appendChild(k);
+      row.appendChild(v);
+      sub.appendChild(row);
+    }
+    wrap.appendChild(sub);
+  }
+
+  return wrap;
 }
 
 // ── stylist pass sheet ──
