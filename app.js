@@ -536,15 +536,18 @@ function showSettledCard() {
 async function kickOffLook(card) {
   const myRun = ++revealRunId;
   const prompt = buildLookPrompt(card);
-  try {
-    const url = await genImageLook(prompt, state.photoR2Url || null);
-    if (myRun !== revealRunId) return;
-    settleCard({ imageUrl: url });
-  } catch (e) {
-    if (myRun !== revealRunId) return;
-    console.warn("genImageLook failed", e);
-    settleCard({ failed: true });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const url = await genImageLook(prompt, state.photoR2Url || null);
+      if (myRun !== revealRunId) return;
+      settleCard({ imageUrl: url });
+      return;
+    } catch (e) {
+      if (myRun !== revealRunId) return;
+      console.warn("genImageLook failed (attempt " + (attempt + 1) + ")", e);
+    }
   }
+  settleCard({ failed: true });
 }
 
 function closeVerdict() {
