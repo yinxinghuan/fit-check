@@ -91,9 +91,6 @@ const EN = {
   case_prefix:         "CASE #",
 
   // ── THE RACK (stylist pass social layer) ──
-  the_rack:            "THE RACK",
-  rack_sub:            "notes from the floor",
-  your_fits:           "YOUR FITS",
   on_the_rack:         "ON THE RACK",
   add_note:            "+ NOTE",
   defend_note:         "+ DEFEND",
@@ -107,6 +104,10 @@ const EN = {
   tap_note_keep:       "tap a note to keep it",
   overruled:           "OVERRULED",
   already_noted:       "you already left a note",
+  view_profile:        "VIEW PROFILE",
+  your_closet:         "YOUR CLOSET",
+  fits_label:          "FITS",
+  mostly_era:          "mostly %s",
 
   // pre-baked stylist chips (KEEP fits)
   chip_belt_it:          "belt it",
@@ -181,9 +182,6 @@ const ZH = {
   case_prefix:         "档案 #",
 
   // ── THE RACK ──
-  the_rack:            "衣架墙",
-  rack_sub:            "来自现场的批注",
-  your_fits:           "你的档案",
   on_the_rack:         "墙上",
   add_note:            "+ 提一句",
   defend_note:         "+ 翻案",
@@ -197,6 +195,10 @@ const ZH = {
   tap_note_keep:       "点一条批注收下它",
   overruled:           "翻案",
   already_noted:       "你已经提过一句了",
+  view_profile:        "看主页",
+  your_closet:         "你的衣橱",
+  fits_label:          "件",
+  mostly_era:          "多为 %s",
 
   chip_belt_it:          "加条腰带",
   chip_tuck_it:          "塞进去穿",

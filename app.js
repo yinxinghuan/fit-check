@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v9";
+} from "./i18n.js?v=v10";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -61,10 +61,13 @@ const caseLogTotal = $("caseLogTotal");
 const caseLogKeep  = $("caseLogKeep");
 const caseLogToss  = $("caseLogToss");
 const issueLineEl  = $("issueLine");
-const rackBtn      = $("rackBtn");
-const rackBadge    = $("rackBadge");
-const rackOverlay  = $("rackOverlay");
-const rackFeed     = $("rackFeed");
+const homeFeed      = $("homeFeed");
+const closetOverlay = $("closetOverlay");
+const closetFeed    = $("closetFeed");
+const closetAvatar  = $("closetAvatar");
+const closetName    = $("closetName");
+const closetStats   = $("closetStats");
+const closetProfileBtn = $("closetProfileBtn");
 const passSheet      = $("passSheet");
 const passSheetTitle = $("passSheetTitle");
 const passSheetChips = $("passSheetChips");
@@ -569,8 +572,6 @@ function closeVerdict() {
 // A note on fit F is "curated" when its id appears in F's author's hearts.
 // Chips are stored by KEY so each viewer reads them in their own locale.
 
-const SEEN_LS_KEY = "fc:rackSeen";
-
 // In-memory source of truth for my own save row. get/data/list is eventually
 // consistent — never refetch-then-write, always write through this mirror.
 let myMirror = null;
@@ -626,6 +627,7 @@ function publishFit(card) {
   persistMirror();
   if (wall) {
     wall.fits.unshift({ ...fit, user: selfUser(), notes: [], curatedDefends: 0 });
+    rerenderSocial();
   }
   return fit.id;
 }
@@ -656,8 +658,7 @@ async function scanRack() {
     return;
   }
   buildWall(rows);
-  renderRackBadge();
-  if (rackOverlay.classList.contains("show")) renderRackFeed();
+  rerenderSocial();
 }
 
 function buildWall(rows) {
@@ -703,79 +704,69 @@ function buildWall(rows) {
     f.notes.push(ps);
   }
 
-  const lastSeen = Number(localStorage.getItem(SEEN_LS_KEY) || 0);
-  const myPassIds = new Set((myMirror.passes || []).map(x => x.id));
-  let newCount = 0;
   for (const f of fits) {
     f.notes.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     const hm = heartsByUser[f.user.id];
-    for (const n of f.notes) {
-      n.curated = !!(hm && hm.has(n.id));
-      if (f.user.id === meId && (n.ts || 0) > lastSeen) newCount++;
-    }
+    for (const n of f.notes) n.curated = !!(hm && hm.has(n.id));
     f.curatedDefends = f.verdict === "TOSS" ? f.notes.filter(n => n.curated).length : 0;
-  }
-  // Hearts other authors gave to MY notes
-  for (const uid of Object.keys(heartsByUser)) {
-    if (uid === meId) continue;
-    for (const [pid, ts] of heartsByUser[uid]) {
-      if (myPassIds.has(pid) && ts > lastSeen) newCount++;
-    }
   }
 
   fits.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  wall = { fits, newCount };
+  wall = { fits };
 }
 
-// ── rack UI ──
+// ── home feed (the rack, inline) + closet ──
 
-function renderRackBadge() {
-  const n = wall ? wall.newCount : 0;
-  if (n > 0) {
-    rackBadge.textContent = String(n);
-    rackBadge.classList.remove("hidden");
-  } else {
-    rackBadge.classList.add("hidden");
-  }
+function rerenderSocial() {
+  renderHomeFeed();
+  if (closetOverlay.classList.contains("show")) renderCloset();
 }
 
-function openRack() {
-  if (!A.isInAigram) { toast(t("rack_outside")); return; }
-  rackOverlay.classList.add("show");
-  renderRackFeed();
-  markRackSeen();
-  scanRack();
-}
-
-function markRackSeen() {
-  try { localStorage.setItem(SEEN_LS_KEY, String(Date.now())); } catch { /* ignore */ }
-  if (wall) wall.newCount = 0;
-  renderRackBadge();
-}
-
-function renderRackFeed() {
-  rackFeed.innerHTML = "";
+function renderHomeFeed() {
+  homeFeed.innerHTML = "";
   const fits = wall ? wall.fits : [];
   if (!fits.length) {
     const d = document.createElement("div");
     d.className = "rack-empty";
-    d.textContent = t("rack_empty");
-    rackFeed.appendChild(d);
+    d.textContent = t(A.isInAigram ? "rack_empty" : "rack_outside");
+    homeFeed.appendChild(d);
     return;
   }
-  const meId = String(me.id || "");
-  const mine   = fits.filter(f => f.user.id === meId);
-  const others = fits.filter(f => f.user.id !== meId);
-  const section = (labelKey, arr) => {
-    if (!arr.length) return;
-    const lab = document.createElement("div");
-    lab.className = "rack-section-label";
-    lab.textContent = t(labelKey);
-    rackFeed.appendChild(lab);
-    for (const f of arr) rackFeed.appendChild(rackCard(f));
-  };
-  section("your_fits", mine);
-  section("on_the_rack", others);
+  for (const f of fits) homeFeed.appendChild(rackCard(f));
+}
+
+let closetUser = null;
+
+function openCloset(user) {
+  closetUser = user;
+  renderCloset();
+  closetOverlay.classList.add("show");
+  closetOverlay.scrollTop = 0;
+}
+
+function renderCloset() {
+  if (!closetUser) return;
+  const isMe = closetUser.id === String(me.id || "");
+  const fits = (wall ? wall.fits : []).filter(f => f.user.id === closetUser.id);
+
+  closetAvatar.innerHTML = "";
+  closetAvatar.appendChild(makeAvatar(closetUser));
+  closetName.textContent = isMe ? t("your_closet") : (closetUser.name || "stylist");
+
+  const keep = fits.filter(f => f.verdict !== "TOSS").length;
+  const toss = fits.length - keep;
+  const eraCount = {};
+  for (const f of fits) if (f.era) eraCount[f.era] = (eraCount[f.era] || 0) + 1;
+  const topEra = Object.keys(eraCount).sort((a, b) => eraCount[b] - eraCount[a])[0];
+  const parts = [`${fits.length} ${t("fits_label")}`, `${keep} KEEP`, `${toss} TOSS`];
+  // "mostly X" only when an era genuinely repeats — with all-distinct eras it lies
+  if (topEra && eraCount[topEra] >= 2) parts.push(t("mostly_era").replace("%s", topEra));
+  closetStats.textContent = parts.join(" · ");
+
+  closetProfileBtn.classList.toggle("hidden", isMe || !A.openAigramProfile);
+
+  closetFeed.innerHTML = "";
+  for (const f of fits) closetFeed.appendChild(rackCard(f));
 }
 
 function makeAvatar(user) {
@@ -803,18 +794,18 @@ function authorChip(user, isMine) {
     s.className = "author-you";
     s.textContent = t("you_label");
     b.appendChild(s);
-    b.style.cursor = "default";
   } else {
     b.appendChild(makeAvatar(user));
     const s = document.createElement("span");
     s.className = "author-name";
     s.textContent = user.name || "stylist";
     b.appendChild(s);
-    b.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (A.openAigramProfile) A.openAigramProfile(user.id);
-    });
   }
+  // onClick (not pointerdown) — we're inside a scrollable feed
+  b.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    openCloset(user);
+  });
   return b;
 }
 
@@ -830,9 +821,7 @@ function noteChip(fit, note, isMineFit) {
     // onClick (not pointerdown) — we're inside a scrollable feed
     b.addEventListener("click", () => heartPass(fit, note));
   } else if (!isMineFit) {
-    b.addEventListener("click", () => {
-      if (A.openAigramProfile) A.openAigramProfile(note.user.id);
-    });
+    b.addEventListener("click", () => openCloset(note.user));
   } else {
     b.style.cursor = "default";
   }
@@ -958,7 +947,7 @@ function sendPass(fit, chipKey) {
 
   // Optimistic insert so the note shows immediately
   fit.notes.unshift({ ...pass, user: selfUser(), curated: false });
-  renderRackFeed();
+  rerenderSocial();
 
   const tmpl = t(fit.verdict === "TOSS" ? "notify_defend" : "notify_pass")
     .replace("%s", chipText(chipKey));
@@ -979,7 +968,7 @@ function heartPass(fit, note) {
   if (fit.verdict === "TOSS") {
     fit.curatedDefends = fit.notes.filter(n => n.curated).length;
   }
-  renderRackFeed();
+  rerenderSocial();
 
   notifyUser(note.user.id, "pass_kept", t("notify_heart"), fit.photo);
   toast(t("kept_note"));
@@ -1079,14 +1068,17 @@ function init() {
     hideError();
     cancelPipeline();
   });
-  // THE RACK — modal close buttons use onClick (pointerdown bleeds through)
-  rackBtn.addEventListener("click", openRack);
-  $("closeRack").addEventListener("click", () => rackOverlay.classList.remove("show"));
+  // Closet — modal close buttons use onClick (pointerdown bleeds through)
+  $("closeCloset").addEventListener("click", () => closetOverlay.classList.remove("show"));
+  closetProfileBtn.addEventListener("click", () => {
+    if (closetUser && A.openAigramProfile) A.openAigramProfile(closetUser.id);
+  });
   $("passSheetCancel").addEventListener("click", closePassSheet);
   passSheet.addEventListener("click", (ev) => {
     if (ev.target === passSheet) closePassSheet();
   });
-  scanRack(); // seed mirror + inbox badge (no-op outside Aigram)
+  renderHomeFeed(); // empty/outside state until the wall arrives
+  scanRack();       // seed mirror + wall (no-op outside Aigram)
   // locale toggle: tap EN / 中 to switch + persist + re-hydrate
   document.querySelectorAll(".locale-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1110,7 +1102,7 @@ function applyLocale() {
   // Re-render dynamic strings that don't have data-i18n
   renderIssueLine();
   renderCaseLog();
-  if (rackOverlay.classList.contains("show")) renderRackFeed();
+  rerenderSocial();
   // Reveal carousel labels are picked up via t() on next render.
 }
 
