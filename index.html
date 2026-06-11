@@ -827,6 +827,29 @@
     object-fit: cover;
     display: block;
   }
+  .rack-card__photo.is-tappable { cursor: pointer; }
+
+  /* ─── Fit detail overlay (stacks above the closet) ────────────────── */
+  .rack-overlay--detail { z-index: 160; }
+  .rack-card--detail { margin-top: 44px; animation: none; }
+  .fit-flip {
+    display: block;
+    width: 100%;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--rule);
+    padding: 10px 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .fit-flip:active { opacity: 0.6; }
   .rack-card__body { padding: 14px 16px 16px; }
   .rack-card__meta {
     display: flex;
@@ -1206,6 +1229,12 @@
   <div class="rack-feed" id="closetFeed"></div>
 </div>
 
+<!-- FIT DETAIL · one fit, plate-first, full notes (stacks above the closet) -->
+<div id="fitOverlay" class="rack-overlay rack-overlay--detail">
+  <button class="icon-close" id="closeFit" aria-label="Close">×</button>
+  <div class="rack-feed" id="fitDetailBody"></div>
+</div>
+
 <!-- Stylist pass sheet · pre-baked chip palette -->
 <div id="passSheet" class="pass-sheet">
   <div class="pass-sheet__panel">
@@ -1227,7 +1256,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=2"></script>
-<script type="module" src="app.js?v=v11"></script>
+<script type="module" src="app.js?v=v12"></script>
 
 </body>
 </html>

@@ -108,6 +108,8 @@ const EN = {
   your_closet:         "YOUR CLOSET",
   fits_label:          "FITS",
   mostly_era:          "mostly %s",
+  view_original:       "SEE THE ORIGINAL PHOTO",
+  view_plate:          "BACK TO THE PLATE",
 
   // pre-baked stylist chips (KEEP fits)
   chip_belt_it:          "belt it",
@@ -199,6 +201,8 @@ const ZH = {
   your_closet:         "你的衣橱",
   fits_label:          "件",
   mostly_era:          "多为 %s",
+  view_original:       "看原图",
+  view_plate:          "回到插画",
 
   chip_belt_it:          "加条腰带",
   chip_tuck_it:          "塞进去穿",

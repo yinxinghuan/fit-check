@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v10";
+} from "./i18n.js?v=v12";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -68,6 +68,8 @@ const closetAvatar  = $("closetAvatar");
 const closetName    = $("closetName");
 const closetStats   = $("closetStats");
 const closetProfileBtn = $("closetProfileBtn");
+const fitOverlay    = $("fitOverlay");
+const fitDetailBody = $("fitDetailBody");
 const passSheet      = $("passSheet");
 const passSheetTitle = $("passSheetTitle");
 const passSheetChips = $("passSheetChips");
@@ -638,9 +640,17 @@ function publishFit(card) {
 function updateFitLook(fitId, lookUrl) {
   if (!fitId || !myMirror) return;
   const f = (myMirror.fits || []).find(x => x && x.id === fitId);
-  if (!f) return;
-  f.look = lookUrl;
-  persistMirror();
+  if (f) {
+    f.look = lookUrl;
+    persistMirror();
+  }
+  if (wall) {
+    const w = wall.fits.find(x => x.id === fitId);
+    if (w) {
+      w.look = lookUrl;
+      rerenderSocial();
+    }
+  }
 }
 
 // ── wall scan + projection ──
@@ -723,6 +733,7 @@ function buildWall(rows) {
 function rerenderSocial() {
   renderHomeFeed();
   if (closetOverlay.classList.contains("show")) renderCloset();
+  if (fitOverlay.classList.contains("show")) renderFitDetail();
 }
 
 function renderHomeFeed() {
@@ -743,8 +754,33 @@ let closetUser = null;
 function openCloset(user) {
   closetUser = user;
   renderCloset();
+  // Detail sits above the closet; opening a closet from a detail card
+  // pops the detail so the closet is what you land on.
+  closeFitDetail();
   closetOverlay.classList.add("show");
   closetOverlay.scrollTop = 0;
+}
+
+let detailFitId = null;
+
+function openFitDetail(fit) {
+  detailFitId = fit.id;
+  renderFitDetail();
+  fitOverlay.classList.add("show");
+  fitOverlay.scrollTop = 0;
+}
+
+function closeFitDetail() {
+  detailFitId = null;
+  fitOverlay.classList.remove("show");
+}
+
+function renderFitDetail() {
+  if (!detailFitId) return;
+  const fit = (wall ? wall.fits : []).find(f => f.id === detailFitId);
+  if (!fit) { closeFitDetail(); return; }
+  fitDetailBody.innerHTML = "";
+  fitDetailBody.appendChild(rackCard(fit, { detail: true }));
 }
 
 function renderCloset() {
@@ -831,23 +867,43 @@ function noteChip(fit, note, isMineFit) {
   return b;
 }
 
-function rackCard(fit) {
+function rackCard(fit, opts) {
+  const detail = !!(opts && opts.detail);
   const meId = String(me.id || "");
   const isMine = fit.user.id === meId;
   const isToss = fit.verdict === "TOSS";
 
   const el = document.createElement("article");
-  el.className = "rack-card";
+  el.className = "rack-card" + (detail ? " rack-card--detail" : "");
 
   const ph = document.createElement("div");
   ph.className = "rack-card__photo";
   const img = document.createElement("img");
-  img.src = fit.photo;
+  // The generated plate is the face of the fit; the raw photo is the fallback
+  // (pre-v8 fits and failed gens have no look).
+  img.src = fit.look || fit.photo;
   img.alt = "";
   img.loading = "lazy";
   img.draggable = false;
   ph.appendChild(img);
   el.appendChild(ph);
+
+  if (!detail) {
+    ph.classList.add("is-tappable");
+    ph.addEventListener("click", () => openFitDetail(fit));
+  } else if (fit.look && fit.photo && fit.look !== fit.photo) {
+    let showingOriginal = false;
+    const flip = document.createElement("button");
+    flip.type = "button";
+    flip.className = "fit-flip";
+    flip.textContent = t("view_original");
+    flip.addEventListener("click", () => {
+      showingOriginal = !showingOriginal;
+      img.src = showingOriginal ? fit.photo : fit.look;
+      flip.textContent = t(showingOriginal ? "view_plate" : "view_original");
+    });
+    el.appendChild(flip);
+  }
 
   const body = document.createElement("div");
   body.className = "rack-card__body";
@@ -860,7 +916,7 @@ function rackCard(fit) {
   meta.appendChild(stamp);
   const cat = document.createElement("span");
   cat.className = "rack-card__cat";
-  cat.textContent = fit.cat || "";
+  cat.textContent = (fit.cat || "") + (detail && fit.era ? " · " + fit.era : "");
   meta.appendChild(cat);
   meta.appendChild(authorChip(fit.user, isMine));
   body.appendChild(meta);
@@ -1073,6 +1129,7 @@ function init() {
   });
   // Closet — modal close buttons use onClick (pointerdown bleeds through)
   $("closeCloset").addEventListener("click", () => closetOverlay.classList.remove("show"));
+  $("closeFit").addEventListener("click", closeFitDetail);
   closetProfileBtn.addEventListener("click", () => {
     if (closetUser && A.openAigramProfile) A.openAigramProfile(closetUser.id);
   });
