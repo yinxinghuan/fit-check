@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v8";
+} from "./i18n.js?v=v9";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -137,16 +137,20 @@ async function genImageLook(prompt, refUrl) {
 // Four serialized illustration styles. The styling LLM picks one per garment
 // (plate_style field, default "catalog"); each has a combo (KEEP, item +
 // companions) and a solo (TOSS, the item alone as a study) variant.
+// "no typography" tail must stay LAST in every prompt — anything appended
+// after it (era suffix, style words like "department store") gets burned
+// into the frame as a garbled header. Verified 2026-06-11 in _style_lab.
 const PLATE_TAIL =
   "warm cream paper background, no human figure, no face, " +
-  "no text no letters, square composition";
+  "absolutely no typography, no words, no letters, no numbers, " +
+  "no labels, unlabeled, square composition";
 
 const PLATE_STYLES = {
   catalog: {
     combo: (item, pieces) =>
-      `mid-century department store catalog illustration: ${item} with companion pieces ${pieces} arranged in a tidy grid, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, retro 1958 print advertisement aesthetic, ${PLATE_TAIL}`,
+      `mid-century retro print illustration: ${item} with companion pieces ${pieces} arranged in a tidy grid, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
     solo: (item) =>
-      `mid-century department store catalog illustration: ${item} alone as a single discontinued catalog item, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, retro 1958 print advertisement aesthetic, ${PLATE_TAIL}`,
+      `mid-century retro print illustration: ${item} alone at center as a single discontinued item, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
   },
   naturalist: {
     combo: (item, pieces) =>
@@ -174,11 +178,12 @@ function pickPlateStyle(card) {
 
 function buildLookPrompt(card) {
   const style = PLATE_STYLES[pickPlateStyle(card)];
-  const item = card.category || "the photographed garment";
-  const era = card.era ? ` era flavor: ${card.era}.` : "";
+  // Era folds INTO the item descriptor — never appended after PLATE_TAIL.
+  const item = (card.category || "the photographed garment") +
+               (card.era ? `, ${card.era} era` : "");
   const pieces = (card.wear_with || []).slice(0, 5).join(", ");
-  if (card.verdict === "TOSS" || !pieces) return style.solo(item) + era;
-  return style.combo(item, pieces) + era;
+  if (card.verdict === "TOSS" || !pieces) return style.solo(item);
+  return style.combo(item, pieces);
 }
 
 async function callCard(vision) {
