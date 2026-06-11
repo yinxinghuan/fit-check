@@ -358,7 +358,6 @@ Example A — OUTPUT:
   "era": "late '80s yacht-club revival",
   "archetype": "trust-fund seasonal rotation",
   "verdict": "KEEP",
-  "plate_style": "croquis",
   "vibe_line": "telegraphs old-money on a thrift budget — works hardest when the rest of the outfit is cheap",
   "wear_with": [
     "Levi's 501 in white, hemmed at ankle",
@@ -398,7 +397,6 @@ Example B — OUTPUT:
   "era": "summer '19 mid-tier-influencer staple",
   "archetype": "Sunday-farmers-market-but-make-it-aesthetic",
   "verdict": "TOSS",
-  "plate_style": "catalog",
   "vibe_line": "reads as a costume from a wedding you don't remember attending",
   "wear_with": null,
   "skip": null,
@@ -424,7 +422,6 @@ Example C — OUTPUT:
   "era": "Urban Outfitters c.2014",
   "archetype": "music-festival-cosplay",
   "verdict": "TOSS",
-  "plate_style": "gouache",
   "vibe_line": "borrows credit it didn't earn — every wear is a small lie",
   "wear_with": null,
   "skip": null,
@@ -439,16 +436,8 @@ Example C — OUTPUT:
   "color_pairing": null
 }
 
-═══ plate_style — illustration style for the card's plate ═══
-Always include "plate_style": one of "catalog" | "naturalist" | "croquis" | "gouache". Applies to BOTH verdicts.
-DEFAULT is "catalog" — pick it whenever no other style clearly fits the garment's personality.
-Switch only on a clear match:
-  • "naturalist" — heritage / utility / workwear / outdoor / denim / leather / military-surplus pieces: things that read like collected specimens
-  • "croquis" — tailoring / silk / atelier / evening / delicate refined pieces
-  • "gouache" — loud color / statement / streetwear / party pieces with graphic energy
-
 ═══ OUTPUT CONTRACT (echo of the examples) ═══
-Always include: category, era, archetype, verdict, vibe_line, plate_style.
+Always include: category, era, archetype, verdict, vibe_line.
 KEEP path: populate wear_with (3-5 SPECIFIC pieces), skip (1-2), where (3-4), reference, care. Set TOSS fields null.
 TOSS path: populate why_toss, but_if, let_go. Set KEEP fields null. Reference and care optional.
 Conditional fields default to null. Only populate when there is a real observation:
@@ -512,7 +501,6 @@ ATTRIBUTES: double-breasted, navy wool, gold buttons, structured shoulder, mid-t
   "era": "80s 末游艇俱乐部 revival",
   "archetype": "信托基金式四季轮换",
   "verdict": "KEEP",
-  "plate_style": "croquis",
   "vibe_line": "用 thrift 价穿出老钱腔 —— 周围越便宜越显贵",
   "wear_with": [
     "Levi's 501 白色，脚踝处裁短",
@@ -552,7 +540,6 @@ ATTRIBUTES: short-sleeve, ditsy floral, elastic waist, wide leg, cotton blend, m
   "era": "summer '19 中等博主标配",
   "archetype": "周日 farmers market 拍照专用",
   "verdict": "TOSS",
-  "plate_style": "catalog",
   "vibe_line": "像一场你已经记不得的婚礼留下的伴娘服",
   "wear_with": null,
   "skip": null,
@@ -578,7 +565,6 @@ ATTRIBUTES: cropped, heather grey, distressed neckline, faded print, screen-prin
   "era": "Urban Outfitters c.2014",
   "archetype": "音乐节 cosplay",
   "verdict": "TOSS",
-  "plate_style": "gouache",
   "vibe_line": "借用了不属于你的信用 —— 每次穿都是个小谎",
   "wear_with": null,
   "skip": null,
@@ -593,16 +579,8 @@ ATTRIBUTES: cropped, heather grey, distressed neckline, faded print, screen-prin
   "color_pairing": null
 }
 
-═══ plate_style — 卡片插画的画风 ═══
-始终包含 "plate_style"：取值 "catalog" | "naturalist" | "croquis" | "gouache" 之一。KEEP 和 TOSS 都要给。
-**默认 "catalog"** —— 没有明显更合适的就选它。
-只在气质明显匹配时切换：
-  • "naturalist" —— heritage / 工装 / 户外 / 牛仔 / 皮革 / 军品：像被收藏的标本的东西
-  • "croquis" —— 剪裁 / 真丝 / atelier / 晚装 / 精致细腻的东西
-  • "gouache" —— 大色块 / statement / 街头 / 派对：有图形能量的东西
-
 ═══ 输出契约（呼应上面示例）═══
-始终包含：category, era, archetype, verdict, vibe_line, plate_style。
+始终包含：category, era, archetype, verdict, vibe_line。
 KEEP 路径：填 wear_with (3-5 个**具体**单品)、skip (1-2)、where (3-4)、reference、care。TOSS 字段全 null。
 TOSS 路径：填 why_toss、but_if、let_go。KEEP 字段全 null。reference 和 care 可填可不填。
 条件字段默认 null。只在真有观察时填：

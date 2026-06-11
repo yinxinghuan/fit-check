@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v16";
+} from "./i18n.js?v=v17";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -139,57 +139,39 @@ async function genImageLook(prompt, refUrl) {
   return json.url;
 }
 
-// Four serialized illustration styles. The styling LLM picks one per garment
-// (plate_style field, default "catalog"); each has a combo (KEEP, item +
-// companions) and a solo (TOSS, the item alone as a study) variant.
+// Single unified plate style (mail-order catalog) since v17 — the 4-style
+// system collapsed after real-device runs: with the user photo as ref_url,
+// img2img tended to PASTE the photo into the plate instead of redrawing it
+// (naturalist's callout lines also invited burned labels). The prompt now
+// leads with an explicit redraw-as-illustration instruction.
 // "no typography" tail must stay LAST in every prompt — anything appended
 // after it (era suffix, style words like "department store") gets burned
 // into the frame as a garbled header. Verified 2026-06-11 in _style_lab.
 const PLATE_TAIL =
+  "zero photographic texture, nothing pasted from the photo, " +
   "warm cream paper background, no human figure, no face, " +
   "absolutely no typography, no words, no letters, no numbers, " +
   "no labels, unlabeled, square composition";
 
-const PLATE_STYLES = {
-  catalog: {
-    combo: (item, pieces) =>
-      `mid-century retro print illustration: ${item} at center as the unmistakable star of the plate, rendered in full saturated color with crisp confident outlines and the richest detail, companion pieces ${pieces} along the bottom edge as small understated spot illustrations in pale washed-out tones with thinner lines, all visual emphasis on the central item, flat gouache colors, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
-    solo: (item) =>
-      `mid-century retro print illustration: ${item} alone at center as a single discontinued item, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
-  },
-  naturalist: {
-    combo: (item, pieces) =>
-      `vintage naturalist field guide specimen plate: ${item} at center as the principal specimen, fully rendered in fine ink linework with complete muted watercolor wash and meticulous detail, secondary studies tucked in the margins as faint barely-tinted light pencil sketches: ${pieces}, the central specimen carries all the visual weight, thin hairline callout lines pointing at its details, antique scientific illustration plate, ${PLATE_TAIL}`,
-    solo: (item) =>
-      `vintage naturalist field guide specimen plate: ${item} drawn as a single catalogued specimen at center, fine ink linework with muted watercolor wash, thin hairline callout lines pointing at its worn details, antique scientific illustration plate, ${PLATE_TAIL}`,
-  },
-  croquis: {
-    combo: (item, pieces) =>
-      `fashion atelier sketchbook illustration: ${item} as the finished main study at center, confident ink outline with loose translucent watercolor wash bleeding past the lines, the only fully painted piece on the page, companion garments in the margin as quick unfinished pencil line sketches with no color: ${pieces}, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
-    solo: (item) =>
-      `fashion atelier sketchbook illustration: ${item} as a single hand-drawn study, confident ink outline with loose translucent watercolor wash bleeding past the lines, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
-  },
-  gouache: {
-    combo: (item, pieces) =>
-      `sophisticated editorial gouache illustration: ${item} painted at center with rich confident brushstrokes, the deepest color and the single hot pink accent reserved for it alone, companion pieces ${pieces} at the edges as pale ghosted thin washes that recede into the paper, clear focal hierarchy with one protagonist, refined fashion magazine illustration, muted palette, painterly, ${PLATE_TAIL}`,
-    solo: (item) =>
-      `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes, alone at center, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
-  },
-};
+const PLATE_HEAD =
+  "mid-century retro print illustration, completely hand-drawn: " +
+  "redraw the garment from the reference photo as a flat illustration " +
+  "with clean confident dark outlines and flat gouache color blocks, ";
 
-function pickPlateStyle(card) {
-  return PLATE_STYLES[card.plate_style] ? card.plate_style : "catalog";
-}
+const plateCombo = (item, pieces) =>
+  `${PLATE_HEAD}${item} at center as the unmistakable centerpiece of the plate, rendered in full saturated color and the richest detail, companion pieces ${pieces} along the bottom edge as small understated spot illustrations in pale washed-out tones with thinner lines, all visual emphasis on the central item, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`;
+
+const plateSolo = (item) =>
+  `${PLATE_HEAD}${item} alone at center as a single discontinued item, full saturated color, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`;
 
 function buildLookPrompt(card) {
-  const style = PLATE_STYLES[pickPlateStyle(card)];
   // Era folds INTO the item descriptor — never appended after PLATE_TAIL.
   const item = (card.category || "the photographed garment") +
                (card.era ? `, ${card.era} era` : "");
   // Three companions max — five invites a grid where the hero shrinks.
   const pieces = (card.wear_with || []).slice(0, 3).join(", ");
-  if (card.verdict === "TOSS" || !pieces) return style.solo(item);
-  return style.combo(item, pieces);
+  if (card.verdict === "TOSS" || !pieces) return plateSolo(item);
+  return plateCombo(item, pieces);
 }
 
 async function callCard(vision) {
