@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v15";
+} from "./i18n.js?v=v16";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -245,6 +245,7 @@ async function onFilePicked(e) {
     toast(t("not_an_image"));
     return;
   }
+  sfxShutter();
   state.photoDataUrl = await fileToDataURL(f);
   runPipeline();
 }
@@ -402,6 +403,7 @@ let revealStart    = 0;
 
 const REVEAL_INTERVAL_MS  = 1700;
 const REVEAL_TIMER_MS     = 200;
+const RACK_POLL_MS        = 45000;
 
 function buildRevealItems(card) {
   const items = [];
@@ -499,6 +501,7 @@ function pushRevealItem() {
   revealBig.classList.add("is-fresh");
   if (item.isStamp) revealBig.classList.add("is-stamp");
   if (item.isToss)  revealBig.classList.add("is-toss");
+  if (item.isStamp) sfxStamp(item.isToss); else sfxTick();
 }
 
 function updateRevealTimer() {
@@ -534,6 +537,7 @@ function settleCard({ imageUrl, failed }) {
 function showSettledCard() {
   revealEl.classList.add("hidden");
   cardEl.classList.remove("hidden");
+  sfxSettle();
 }
 
 async function kickOffLook(card) {
@@ -693,7 +697,19 @@ async function scanRack() {
     return;
   }
   buildWall(rows);
+  // Skip the repaint when nothing changed — refresh polling must not make
+  // the feed flicker or shift under the user's thumb.
+  if (wallSig() === lastWallSig) return;
   rerenderSocial();
+}
+
+let lastWallSig = null;
+
+function wallSig() {
+  return (wall ? wall.fits : []).map(f =>
+    f.id + ":" + (f.look || "") + ":" +
+    f.notes.map(n => n.id + (n.curated ? "*" : "")).join(",")
+  ).join("|");
 }
 
 function buildWall(rows) {
@@ -753,6 +769,7 @@ function buildWall(rows) {
 // ── home feed (the rack, inline) + closet ──
 
 function rerenderSocial() {
+  lastWallSig = wallSig();
   renderHomeFeed();
   if (closetOverlay.classList.contains("show")) renderCloset();
   if (fitOverlay.classList.contains("show")) renderFitDetail();
@@ -774,6 +791,7 @@ function renderHomeFeed() {
 let closetUser = null;
 
 function openCloset(user) {
+  sfxPage();
   closetUser = user;
   renderCloset();
   // Detail sits above the closet; opening a closet from a detail card
@@ -786,6 +804,7 @@ function openCloset(user) {
 let detailFitId = null;
 
 function openFitDetail(fit) {
+  sfxPage();
   detailFitId = fit.id;
   renderFitDetail();
   fitOverlay.classList.add("show");
@@ -1074,6 +1093,7 @@ function openPassSheet(fit) {
     b.addEventListener("click", () => sendPass(fit, key));
     passSheetChips.appendChild(b);
   }
+  sfxTap();
   passSheet.classList.add("show");
 }
 
@@ -1108,6 +1128,7 @@ function sendPass(fit, chipKey) {
   const tmpl = t(fit.verdict === "TOSS" ? "notify_defend" : "notify_pass")
     .replace("%s", chipText(chipKey));
   notifyUser(fit.user.id, "stylist_pass", tmpl, fit.look || fit.photo);
+  sfxSend();
   toast(t("noted"));
 }
 
@@ -1127,8 +1148,130 @@ function heartPass(fit, note) {
   rerenderSocial();
 
   notifyUser(note.user.id, "pass_kept", t("notify_heart"), fit.look || fit.photo);
+  sfxHeart();
   toast(t("kept_note"));
 }
+
+// ─── SFX (synth-only, no assets) ─────────────────────────────────────
+// Master-bus compressor + per-tone lowpass envelope + noise transients +
+// breathing room tone. Audio only ever starts from a user gesture:
+// ensureAudio() runs on the first tone()/noiseHit() call, and every first
+// call site is gesture-driven (shutter, page, tap). Never call on mount.
+
+let actx = null, audioBus = null;
+
+function ensureAudio() {
+  if (actx) {
+    if (actx.state === "suspended") actx.resume().catch(() => {});
+    return;
+  }
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -18; comp.knee.value = 12; comp.ratio.value = 4;
+    comp.attack.value = 0.003;  comp.release.value = 0.12;
+    const mg = actx.createGain(); mg.gain.value = 0.7;
+    comp.connect(mg); mg.connect(actx.destination);
+    audioBus = comp;
+    startAmbient();
+  } catch (e) { actx = null; }
+}
+
+function tone(freq, dur, type = "sine", delay = 0, peak = 0.12) {
+  try {
+    ensureAudio(); if (!actx) return;
+    const t0 = actx.currentTime + delay;
+    const o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
+    o.type = type; o.frequency.value = freq;
+    f.type = "lowpass"; f.Q.value = 0.6;
+    f.frequency.setValueAtTime(2600, t0);
+    f.frequency.exponentialRampToValueAtTime(560, t0 + dur);
+    o.connect(f); f.connect(g); g.connect(audioBus);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.start(t0); o.stop(t0 + dur + 0.04);
+  } catch (e) {}
+}
+
+function noiseHit(dur, peak = 0.08, delay = 0, lpCut = 4000) {
+  try {
+    ensureAudio(); if (!actx) return;
+    const t0 = actx.currentTime + delay;
+    const len = Math.max(1, Math.ceil(dur * actx.sampleRate));
+    const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+    const s = actx.createBufferSource(); s.buffer = buf;
+    const f = actx.createBiquadFilter();
+    f.type = "lowpass"; f.frequency.value = lpCut; f.Q.value = 0.5;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(f); f.connect(g); g.connect(audioBus);
+    s.start(t0); s.stop(t0 + dur + 0.02);
+  } catch (e) {}
+}
+
+// Atelier room tone — low indoor hum that breathes with real silent gaps
+// (instant-play rule: no continuous drone, preload must stay silent).
+let ambientStarted = false, ambientGain = null;
+
+function startAmbient() {
+  if (ambientStarted || !actx) return;
+  ambientStarted = true;
+  const a = actx.createOscillator(); a.type = "sine"; a.frequency.value = 92;
+  const b = actx.createOscillator(); b.type = "sine"; b.frequency.value = 96;
+  const f = actx.createBiquadFilter();
+  f.type = "lowpass"; f.frequency.value = 150; f.Q.value = 0.4;
+  ambientGain = actx.createGain(); ambientGain.gain.value = 0.0001;
+  a.connect(f); b.connect(f); f.connect(ambientGain); ambientGain.connect(audioBus);
+  a.start(); b.start();
+  cycleAmbient(actx.currentTime + 0.5);
+}
+
+function cycleAmbient(at) {
+  if (!ambientGain || !actx) return;
+  const rise = 6 + Math.random() * 3, hold = 9 + Math.random() * 6;
+  const fall = 7 + Math.random() * 3, quiet = 8 + Math.random() * 8;
+  const peak = 0.012 + Math.random() * 0.008;
+  const g = ambientGain.gain;
+  g.cancelScheduledValues(at);
+  g.setValueAtTime(0.0001, at);
+  g.exponentialRampToValueAtTime(peak, at + rise);
+  g.setValueAtTime(peak, at + rise + hold);
+  g.exponentialRampToValueAtTime(0.0001, at + rise + hold + fall);
+  setTimeout(() => cycleAmbient(actx.currentTime + 0.05),
+             (rise + hold + fall + quiet) * 1000);
+}
+
+// Voice set — quiet, editorial. Peaks stay low on purpose.
+function sfxShutter() {
+  noiseHit(0.018, 0.10, 0, 6000);
+  noiseHit(0.030, 0.06, 0.055, 2600);
+  tone(140, 0.07, "sine", 0, 0.08);
+}
+function sfxTick() { tone(1240, 0.05, "sine", 0, 0.03); }
+function sfxStamp(isToss) {
+  noiseHit(0.03, 0.10, 0, 2400);
+  if (isToss) {
+    tone(220, 0.22, "triangle", 0.01, 0.14);
+    tone(165, 0.30, "triangle", 0.10, 0.12);
+  } else {
+    tone(392, 0.16, "triangle", 0.01, 0.12);
+    tone(587, 0.24, "triangle", 0.09, 0.14);
+  }
+}
+function sfxSettle() {
+  noiseHit(0.02, 0.04, 0, 3000);
+  tone(523, 0.16, "sine", 0, 0.09);
+  tone(784, 0.22, "sine", 0.07, 0.07);
+}
+function sfxPage()  { noiseHit(0.06, 0.045, 0, 1600); }
+function sfxTap()   { tone(660, 0.05, "triangle", 0, 0.06); }
+function sfxSend()  { tone(880, 0.08, "triangle", 0, 0.10); noiseHit(0.015, 0.05, 0, 4000); }
+function sfxHeart() { tone(1175, 0.09, "sine", 0, 0.08); tone(1568, 0.14, "sine", 0.06, 0.08); }
 
 // ─── UI helpers ──────────────────────────────────────────────────────
 
@@ -1236,6 +1379,18 @@ function init() {
   });
   renderHomeFeed(); // empty/outside state until the wall arrives
   scanRack();       // seed mirror + wall (no-op outside Aigram)
+  // Keep the rack fresh: re-scan when the tab comes back to the foreground,
+  // and poll while visible — but only start the timer after the first real
+  // touch (preload rule: no unbounded pre-interaction timers).
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scanRack();
+  });
+  document.addEventListener("pointerdown", () => {
+    ensureAudio(); // first gesture unlocks the audio graph
+    setInterval(() => {
+      if (document.visibilityState === "visible") scanRack();
+    }, RACK_POLL_MS);
+  }, { once: true });
   // locale toggle: tap EN / 中 to switch + persist + re-hydrate
   document.querySelectorAll(".locale-btn").forEach(btn => {
     btn.addEventListener("click", () => {
