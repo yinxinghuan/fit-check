@@ -816,18 +816,69 @@
     animation: fc-card-in 0.4s ease-out;
   }
   .rack-card__photo {
+    position: relative;
     aspect-ratio: 1;
     background: var(--ink);
     overflow: hidden;
     border-bottom: 1px solid var(--rule);
+  }
+  .rack-card__photo::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg,
+      rgba(255,255,255,0.04) 30%,
+      rgba(255,255,255,0.14) 50%,
+      rgba(255,255,255,0.04) 70%);
+    background-size: 220% 100%;
+    animation: fc-shimmer 1.4s linear infinite;
+  }
+  .rack-card__photo.is-loaded::before { display: none; }
+  @keyframes fc-shimmer {
+    from { background-position: 130% 0; }
+    to   { background-position: -90% 0; }
   }
   .rack-card__photo img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
+    position: relative;
+    opacity: 0;
+    transition: opacity 0.35s ease;
   }
+  .rack-card__photo.is-loaded img { opacity: 1; }
   .rack-card__photo.is-tappable { cursor: pointer; }
+  .rack-card__developing {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px;
+    border-radius: 999px;
+    background: rgba(26,26,26,0.78);
+    color: #FDF6EC;
+    font-family: "Space Mono", monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .rack-card__dev-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--pink);
+    animation: fc-dev-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes fc-dev-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.35; transform: scale(0.72); }
+  }
 
   /* ─── Fit detail overlay (stacks above the closet) ────────────────── */
   .rack-overlay--detail { z-index: 160; }
@@ -1246,7 +1297,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="./aigram-bridge.js?v=2"></script>
-<script type="module" src="app.js?v=v17"></script>
+<script type="module" src="app.js?v=v18"></script>
 
 </body>
 </html>

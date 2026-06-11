@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v17";
+} from "./i18n.js?v=v18";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -494,12 +494,14 @@ function updateRevealTimer() {
 // Swap from reveal → settled card once the plate arrives or fails.
 function settleCard({ imageUrl, failed }) {
   stopReveal();
+  pendingLookFitId = null;
   if (failed) {
     // Show the card without an image at top + flag the status briefly so
     // the user knows the flatlay isn't coming. Card body still reads fine.
     cardPhoto.classList.add("hidden");
     revealStatus.textContent = t("flatlay_missed");
     revealStatus.classList.add("is-failed");
+    rerenderSocial(); // drop the developing chip — the plate isn't coming
     setTimeout(showSettledCard, 700);
     return;
   }
@@ -622,6 +624,10 @@ function pickBrief(c) {
   return Object.keys(b).length ? b : undefined;
 }
 
+// The fit whose plate generation is currently in flight — its rack/detail
+// card shows a "developing" chip until settleCard resolves either way.
+let pendingLookFitId = null;
+
 function publishFit(card) {
   if (!A.isInAigram || !A.gameUuid || !me.id || !state.photoR2Url) return null;
   if (!myMirror) myMirror = {};
@@ -638,6 +644,7 @@ function publishFit(card) {
   myMirror.fits = (myMirror.fits || []).slice(-11);
   myMirror.fits.push(fit);
   persistMirror();
+  pendingLookFitId = fit.id;
   if (wall) {
     wall.fits.unshift({ ...fit, user: selfUser(), notes: [], curatedDefends: 0 });
     rerenderSocial();
@@ -902,13 +909,26 @@ function rackCard(fit, opts) {
   const ph = document.createElement("div");
   ph.className = "rack-card__photo";
   const img = document.createElement("img");
-  // The generated plate is the face of the fit; the raw photo is the fallback
-  // (pre-v8 fits and failed gens have no look).
-  img.src = fit.look || fit.photo;
   img.alt = "";
   img.loading = "lazy";
   img.draggable = false;
+  // Shimmer placeholder until the image bytes actually arrive.
+  img.addEventListener("load",  () => ph.classList.add("is-loaded"));
+  img.addEventListener("error", () => ph.classList.add("is-loaded"));
+  // The generated plate is the face of the fit; the raw photo is the fallback
+  // (pre-v8 fits and failed gens have no look).
+  img.src = fit.look || fit.photo;
+  if (img.complete && img.naturalWidth) ph.classList.add("is-loaded");
   ph.appendChild(img);
+  if (!fit.look && fit.id === pendingLookFitId) {
+    const dev = document.createElement("div");
+    dev.className = "rack-card__developing";
+    const dot = document.createElement("span");
+    dot.className = "rack-card__dev-dot";
+    dev.appendChild(dot);
+    dev.appendChild(document.createTextNode(t("plate_developing")));
+    ph.appendChild(dev);
+  }
   el.appendChild(ph);
 
   if (!detail) {

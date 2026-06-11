@@ -69,6 +69,7 @@ const EN = {
   // the look + reveal carousel
   the_look:            "The look",
   the_look_developing: "the look is developing",
+  plate_developing:    "illustration developing",
   flatlay_missed:      "the flatlay didn't develop",
   category_label:      "the item",
   era_label:           "era",
@@ -164,6 +165,7 @@ const ZH = {
 
   the_look:            "搭配图",
   the_look_developing: "正在出片",
+  plate_developing:    "插画绘制中",
   flatlay_missed:      "搭配图没出来",
   category_label:      "这是什么",
   era_label:           "年代",
