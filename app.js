@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v14";
+} from "./i18n.js?v=v15";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -153,25 +153,25 @@ const PLATE_TAIL =
 const PLATE_STYLES = {
   catalog: {
     combo: (item, pieces) =>
-      `mid-century retro print illustration: ${item} as the dominant hero subject, drawn large at center filling most of the frame, companion pieces ${pieces} drawn at a much smaller scale in a single row along the bottom edge, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
+      `mid-century retro print illustration: ${item} at center as the unmistakable star of the plate, rendered in full saturated color with crisp confident outlines and the richest detail, companion pieces ${pieces} along the bottom edge as small understated spot illustrations in pale washed-out tones with thinner lines, all visual emphasis on the central item, flat gouache colors, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
     solo: (item) =>
       `mid-century retro print illustration: ${item} alone at center as a single discontinued item, flat gouache colors, clean uniform dark outlines, subtle halftone print texture, 1950s commercial art aesthetic, ${PLATE_TAIL}`,
   },
   naturalist: {
     combo: (item, pieces) =>
-      `vintage naturalist field guide specimen plate: ${item} as the principal specimen, drawn large at center dominating the plate, fine ink linework with muted watercolor wash, much smaller secondary studies tucked in the margins: ${pieces}, thin hairline callout lines pointing at details, antique scientific illustration plate, ${PLATE_TAIL}`,
+      `vintage naturalist field guide specimen plate: ${item} at center as the principal specimen, fully rendered in fine ink linework with complete muted watercolor wash and meticulous detail, secondary studies tucked in the margins as faint barely-tinted light pencil sketches: ${pieces}, the central specimen carries all the visual weight, thin hairline callout lines pointing at its details, antique scientific illustration plate, ${PLATE_TAIL}`,
     solo: (item) =>
       `vintage naturalist field guide specimen plate: ${item} drawn as a single catalogued specimen at center, fine ink linework with muted watercolor wash, thin hairline callout lines pointing at its worn details, antique scientific illustration plate, ${PLATE_TAIL}`,
   },
   croquis: {
     combo: (item, pieces) =>
-      `fashion atelier sketchbook illustration: ${item} as the main study, drawn large and dominating the page, confident ink outline with loose translucent watercolor wash bleeding past the lines, companion garments sketched far smaller in the margin: ${pieces}, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
+      `fashion atelier sketchbook illustration: ${item} as the finished main study at center, confident ink outline with loose translucent watercolor wash bleeding past the lines, the only fully painted piece on the page, companion garments in the margin as quick unfinished pencil line sketches with no color: ${pieces}, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
     solo: (item) =>
       `fashion atelier sketchbook illustration: ${item} as a single hand-drawn study, confident ink outline with loose translucent watercolor wash bleeding past the lines, a small fabric swatch pinned in one corner, designer croquis style, ${PLATE_TAIL}`,
   },
   gouache: {
     combo: (item, pieces) =>
-      `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes as the dominant subject, large at center filling most of the frame, companion pieces ${pieces} much smaller at the edges, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
+      `sophisticated editorial gouache illustration: ${item} painted at center with rich confident brushstrokes, the deepest color and the single hot pink accent reserved for it alone, companion pieces ${pieces} at the edges as pale ghosted thin washes that recede into the paper, clear focal hierarchy with one protagonist, refined fashion magazine illustration, muted palette, painterly, ${PLATE_TAIL}`,
     solo: (item) =>
       `sophisticated editorial gouache illustration: ${item} painted loosely with visible brushstrokes, alone at center, refined fashion magazine illustration, muted palette with a single hot pink accent, painterly, ${PLATE_TAIL}`,
   },
