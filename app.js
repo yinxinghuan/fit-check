@@ -13,7 +13,7 @@ import {
   SUGGEST_CHIPS,
   DEFEND_CHIPS,
   chipText,
-} from "./i18n.js?v=v6";
+} from "./i18n.js?v=v7";
 
 const UPLOAD_URL    = "https://chat.aiwaves.tech/aigram/api/upload";
 const RECOGNIZE_URL = "https://chat.aiwaves.tech/aigram/api/recognize";
@@ -623,7 +623,9 @@ async function scanRack() {
       `/note/aigram/ai/game/get/data/list?session_id=${encodeURIComponent(A.gameUuid)}`,
       "GET"
     );
-    rows = res?.data || [];
+    rows = (res && Array.isArray(res.data)) ? res.data
+         : Array.isArray(res) ? res
+         : [];
   } catch (e) {
     console.warn("scanRack: data/list failed", e);
     return;
